@@ -1,7 +1,8 @@
 # Deploy on Vercel
 
-SketchSaathi runs on Vercel with a Neon Postgres database. Live collaboration is off there
-(Vercel has no WebSockets); drawing, saving, pages, files, guest mode and login all work.
+SketchSaathi runs on Vercel with a Neon Postgres database. Vercel detects Django from `manage.py`
+and runs it through `config.asgi`, so no `vercel.json` or extra entry file is needed.
+Live collaboration is off by default there; see "Live collaboration" below.
 
 ## 1. Database
 
@@ -17,7 +18,7 @@ Project -> Settings -> Environment Variables:
 | `DEBUG` | `False` |
 | `SECRET_KEY` | a long random string (`python -c "import secrets; print(secrets.token_urlsafe(50))"`) |
 
-`VERCEL` is set by Vercel itself, which also allows `*.vercel.app` hosts and turns live sync off.
+`VERCEL` is set by Vercel itself, which also allows `*.vercel.app` hosts.
 For a custom domain add `ALLOWED_HOSTS=yourdomain.com` and `CSRF_TRUSTED_ORIGINS=https://yourdomain.com`.
 
 ## 3. Create the tables (once)
@@ -38,6 +39,9 @@ Or from the terminal: `npm i -g vercel`, `vercel login`, `vercel --prod`.
 
 ## Notes
 
-- `api/index.py` is the Vercel entry point and `vercel.json` sends every request to it.
 - Local development still uses MySQL (`pip install -r requirements-dev.txt`).
-- To get live collaboration back, host the app on a service with WebSockets (Railway, Render, Fly.io).
+## Live collaboration
+
+Vercel supports WebSockets (beta), but connections are pinned to one function instance, so sharing
+drawings between people needs a Redis channel layer, and clients must reconnect when a connection
+closes at the function's maximum duration. Until that is added, `LIVE_COLLAB` stays off on Vercel.
