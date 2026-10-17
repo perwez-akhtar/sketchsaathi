@@ -1,9 +1,18 @@
 venv/
 __pycache__/
 *.pyc
-db.sqlite3
-.env
 
+# secrets and local data
+.env
+.env.*
+!.env.example
+*.sqlite3
+*.sql
+*.log
+*.saathi
 staticfiles/
+
+# tools
+.vercel/
 .idea/
 .vscode/

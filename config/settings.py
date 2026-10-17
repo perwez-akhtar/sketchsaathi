@@ -7,11 +7,28 @@ from django.core.exceptions import ImproperlyConfigured
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def load_env_file(path):
+    # reads KEY=value lines from a private .env file; real environment variables win
+    if not path.exists():
+        return
+    for line in path.read_text(encoding='utf-8').splitlines():
+        line = line.strip()
+        if line and not line.startswith('#') and '=' in line:
+            key, value = line.split('=', 1)
+            os.environ.setdefault(key.strip(), value.strip().strip('"\''))
+
+
+load_env_file(BASE_DIR / '.env')
+
+
 SECRET_KEY = os.environ.get(
     'SECRET_KEY', 'django-insecure-dev-only-change-me-in-production'
 )
 
-DEBUG = os.environ.get('DEBUG', 'True').lower() in ('1', 'true', 'yes')
+# debug pages show settings and variables, so they are only on by default for local development
+# (no SECRET_KEY set, not on Vercel); anywhere else you must turn them on yourself
+LOCAL_DEV = not os.environ.get('SECRET_KEY') and not os.environ.get('VERCEL')
+DEBUG = os.environ.get('DEBUG', 'True' if LOCAL_DEV else 'False').lower() in ('1', 'true', 'yes')
 
 if not DEBUG and (SECRET_KEY.startswith('django-insecure') or len(SECRET_KEY) < 32):
     raise ImproperlyConfigured('Set a long, random SECRET_KEY when DEBUG is off.')
@@ -47,6 +64,7 @@ except ImportError:
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    'boards.middleware.no_store',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',

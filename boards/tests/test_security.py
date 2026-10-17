@@ -117,3 +117,15 @@ class SocketOriginTests(TransactionTestCase):
         own = WebsocketCommunicator(application, path, headers=[(b'origin', b'http://testserver')])
         connected, code = await own.connect()
         self.assertEqual((connected, code), (False, 4401))
+
+
+class CachingTests(TestCase):
+    def test_private_pages_and_api_are_never_cached(self):
+        user = User.objects.create_user('alice', password='pw-12345-x')
+        self.client.force_login(user)
+        for url in ('/', '/api/boards/', '/login/'):
+            self.assertEqual(self.client.get(url).headers['Cache-Control'], 'private, no-store', url)
+
+    def test_static_files_can_be_cached(self):
+        res = self.client.get('/static/boards/css/app.css')
+        self.assertNotEqual(res.headers.get('Cache-Control'), 'private, no-store')
