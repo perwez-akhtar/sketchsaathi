@@ -1,8 +1,10 @@
 asgiref==3.12.1
-Django==6.1.2
 channels==4.3.2
 daphne==4.2.3
+dj-database-url==2.3.0
+Django==6.1.2
 djangorestframework==3.18.3
-mysqlclient==2.3.0
+psycopg[binary]==3.2.9
 sqlparse==0.6.0
 tzdata==2026.5
+whitenoise==6.9.0

@@ -34,7 +34,7 @@ Edits are broadcast to everyone on the board; boards autosave shortly after a ch
 ## Production checklist
 
 - Set `SECRET_KEY`, `DEBUG=False` and `ALLOWED_HOSTS`; this also turns on secure cookies.
-- Run `python manage.py collectstatic` and serve `staticfiles/` (e.g. via nginx or WhiteNoise).
+- Static files are served by WhiteNoise, so no `collectstatic` step is needed.
 - Run the app with an ASGI server (`daphne config.asgi:application`) behind HTTPS so `wss://` works.
 - Use `channels-redis` for `CHANNEL_LAYERS` if you run more than one process.
 - Use MariaDB 10.11+ / MySQL 8.4+.

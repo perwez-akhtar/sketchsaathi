@@ -1,0 +1,8 @@
+venv/
+db.sqlite3
+boards/tests/
+docs/
+requirements-dev.txt
+__pycache__/
+*.pyc
+.env

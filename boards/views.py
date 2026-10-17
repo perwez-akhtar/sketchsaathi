@@ -1,5 +1,6 @@
 import hashlib
 
+from django.conf import settings
 from django.contrib.auth import login, logout
 from django.core.cache import cache
 from django.contrib.auth.decorators import login_required
@@ -26,20 +27,20 @@ FEATURES = [
 @ensure_csrf_cookie
 def home(request):
     if request.user.is_authenticated:
-        return render(request, 'boards/index.html', {'guest': False})
+        return render(request, 'boards/index.html', {'guest': False, 'live_collab': settings.LIVE_COLLAB})
     return render(request, 'boards/landing.html', {'features': FEATURES})
 
 
 @login_required
 @ensure_csrf_cookie
 def board_link(request, board_uuid):
-    return render(request, 'boards/index.html', {'guest': False})
+    return render(request, 'boards/index.html', {'guest': False, 'live_collab': settings.LIVE_COLLAB})
 
 
 def draw(request):
     if request.user.is_authenticated:
         return redirect('home')
-    return render(request, 'boards/index.html', {'guest': True})
+    return render(request, 'boards/index.html', {'guest': True, 'live_collab': False})
 
 
 def login_user(request):

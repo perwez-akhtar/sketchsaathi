@@ -3,6 +3,7 @@
   const $ = id => document.getElementById(id);
   const DRAWING_EVENTS = ['add', 'update', 'remove', 'clear', 'order', 'background'];
   const GUEST = document.body.dataset.guest === '1';
+  const LIVE = !GUEST && document.body.dataset.live !== '0';
   const HOME_PATH = GUEST ? '/draw/' : '/';
   const LAST_KEY = GUEST ? 'sketchsaathi.guest.last' : 'sketchsaathi.last';
 
@@ -126,7 +127,7 @@
     pages = board.pages;
     $('delete').hidden = !board.is_owner;
     presence.clear();
-    if (!GUEST) collab.connect(boardId);
+    if (LIVE) collab.connect(boardId);
   }
 
   async function refreshBoardList() {

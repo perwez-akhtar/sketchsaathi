@@ -1,7 +1,7 @@
 {% extends 'boards/layouts/base.html' %}
 {% load static %}
 
-{% block body_attrs %}{% if guest %} data-guest="1"{% endif %}{% endblock %}
+{% block body_attrs %}{% if guest %} data-guest="1"{% endif %}{% if not live_collab %} data-live="0"{% endif %}{% endblock %}
 
 {% block content %}
   <canvas id="canvas"></canvas>
