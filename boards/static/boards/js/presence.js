@@ -1,9 +1,8 @@
-// Who is on the board: avatar list and live cursors of other collaborators.
 window.SketchSaathi = window.SketchSaathi || {};
 
 SketchSaathi.presence = (() => {
   const IDLE_MS = 15000;
-  const people = new Map();            // cid -> { user, color, x, y, seen, el }
+  const people = new Map();
   const layer = document.getElementById('cursors');
   const list = document.getElementById('people');
   let toScreen = (x, y) => [x, y];
@@ -20,8 +19,9 @@ SketchSaathi.presence = (() => {
     return el;
   }
 
+  // one avatar per user, even with several tabs open
   function renderAvatars() {
-    const seen = new Map();            // one avatar per user, even with several tabs
+    const seen = new Map();
     people.forEach(p => seen.set(p.user, p));
     list.innerHTML = '';
     [...seen.values()].slice(0, 5).forEach(p => {
@@ -54,11 +54,9 @@ SketchSaathi.presence = (() => {
 
   return {
     colorFor,
-    // `fn` converts board coordinates to screen coordinates.
     setProjection(fn) { toScreen = fn; people.forEach(place); },
     refresh() { people.forEach(place); },
 
-    // Returns true when the event was a presence event (and so needs no drawing).
     handle(event) {
       if (event.type === 'leave') {
         const person = people.get(event.cid);

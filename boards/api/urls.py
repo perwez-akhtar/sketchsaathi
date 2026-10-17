@@ -1,9 +1,10 @@
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 
-from .views import BoardViewSet, PageViewSet
+from . import views
 
-router = DefaultRouter()
-router.register('boards', BoardViewSet)
-router.register('pages', PageViewSet)
-
-urlpatterns = router.urls
+urlpatterns = [
+    path('boards/', views.boards, name='api-boards'),
+    path('boards/<uuid:uuid>/', views.board_detail, name='api-board'),
+    path('boards/<uuid:uuid>/pages/', views.add_page, name='api-add-page'),
+    path('pages/<uuid:uuid>/', views.page_detail, name='api-page'),
+]

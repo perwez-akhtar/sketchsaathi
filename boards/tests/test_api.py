@@ -33,13 +33,15 @@ class BoardApiTests(APITestCase):
         self.assertEqual(self.client.get('/api/boards/?search=wire').data['count'], 1)
         self.assertEqual(self.client.get('/api/boards/?search=secret').data['count'], 0)
 
-    def test_collaborator_can_rename_but_not_delete_board(self):
+    def test_collaborator_can_open_but_not_rename_or_delete_board(self):
         board = self.make_board('Shared')
         self.client.force_authenticate(self.bob)
         url = f'/api/boards/{board.uuid}/'
-        res = self.client.patch(url, {'title': 'Renamed'}, format='json')
+        res = self.client.get(url)
         self.assertEqual((res.status_code, res.data['is_owner']), (200, False))
+        self.assertEqual(self.client.patch(url, {'title': 'Renamed'}, format='json').status_code, 403)
         self.assertEqual(self.client.delete(url).status_code, 403)
+        self.assertEqual(Board.objects.get(pk=board.pk).title, 'Shared')
 
     def test_owner_can_delete_board_and_its_pages(self):
         board = self.make_board('Mine')
@@ -56,7 +58,7 @@ class PageApiTests(APITestCase):
         self.first = Page.objects.create(board=self.board, name='Page 1')
 
     def test_add_pages_in_order(self):
-        self.client.force_authenticate(self.bob)          # collaborators can add pages too
+        self.client.force_authenticate(self.bob)
         url = f'/api/boards/{self.board.uuid}/pages/'
         second = self.client.post(url, {'name': 'Ideas'}, format='json')
         third = self.client.post(url, {'name': 'Todo'}, format='json')
@@ -64,7 +66,7 @@ class PageApiTests(APITestCase):
         self.assertEqual(third.data['position'], 2)
         board = self.client.get(f'/api/boards/{self.board.uuid}/').data
         self.assertEqual([p['name'] for p in board['pages']], ['Page 1', 'Ideas', 'Todo'])
-        self.assertNotIn('elements', board['pages'][0])     # tab list stays light
+        self.assertNotIn('elements', board['pages'][0])
 
     def test_save_and_load_page_drawing(self):
         self.client.force_authenticate(self.alice)

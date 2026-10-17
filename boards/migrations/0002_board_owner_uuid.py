@@ -13,7 +13,6 @@ def fill_uuids(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('boards', '0001_initial'),
@@ -28,7 +27,6 @@ class Migration(migrations.Migration):
                 related_name='boards', to=settings.AUTH_USER_MODEL,
             ),
         ),
-        # Add as nullable first so existing rows can each get their own value.
         migrations.AddField(
             model_name='board',
             name='uuid',

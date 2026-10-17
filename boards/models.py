@@ -8,13 +8,7 @@ hex_color = RegexValidator(r'^#[0-9a-fA-F]{6}\Z', 'Enter a colour like #ffffff.'
 
 
 class Board(models.Model):
-    """A sketch board made of one or more pages (shown as tabs).
-
-    The `uuid` is the public identifier used in share links and URLs, so
-    board ids can't be guessed. Anyone signed in who has the link can edit;
-    only the owner can delete the board.
-    """
-
+    # uuid is the public id used in share links; ids can't be guessed
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
@@ -32,8 +26,6 @@ class Board(models.Model):
 
 
 class Page(models.Model):
-    """One tab of a board. `elements` holds the drawn shapes as JSON."""
-
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='pages')
     name = models.CharField(max_length=100, default='Page 1')

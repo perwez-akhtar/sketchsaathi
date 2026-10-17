@@ -24,7 +24,6 @@ class BoardSocketTests(TransactionTestCase):
         return alice, bob, board
 
     async def open_pair(self):
-        """Alice joins first, then Bob; Alice's `join` notification is consumed here."""
         alice_user, bob_user, board = await self.setup_board()
         alice, bob = connect(board.uuid, alice_user), connect(board.uuid, bob_user)
         self.assertTrue((await alice.connect())[0])
@@ -41,7 +40,6 @@ class BoardSocketTests(TransactionTestCase):
 
     async def test_drawing_event_reaches_others_with_server_set_identity(self):
         alice, bob, _ = await self.open_pair()
-        # A client can't pretend to be someone else.
         await alice.send_json_to({'type': 'add', 'element': {'id': 'e1', 'type': 'line'}, 'user': 'mallory'})
 
         got = await bob.receive_json_from()

@@ -50,9 +50,9 @@ class AuthPageTests(TestCase):
             res = self.client.get(url)
             self.assertContains(res, 'class="form-control"')
         res = self.client.post('/login/', {'username': 'nobody', 'password': 'wrong'})
-        self.assertContains(res, 'alert-danger')                    # wrong login: message for the whole form
+        self.assertContains(res, 'alert-danger')
         res = self.client.post('/signup/', {'username': 'x', 'password1': 'Str0ng-pass-99', 'password2': 'other'})
-        self.assertContains(res, 'is-invalid')                      # bad field: highlighted
+        self.assertContains(res, 'is-invalid')
 
     def test_login_and_logout(self):
         User.objects.create_user('alice', password='pw-12345-x')

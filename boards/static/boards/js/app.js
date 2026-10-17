@@ -1,34 +1,31 @@
-// Wires the toolbar, page tabs, properties panel, canvas, API and live collaboration together.
 (() => {
-  const { api, canvas, collab, presence, ui } = SketchSaathi;
+  const { api, canvas, collab, presence, ui, fileIo } = SketchSaathi;
   const $ = id => document.getElementById(id);
   const DRAWING_EVENTS = ['add', 'update', 'remove', 'clear', 'order', 'background'];
-  // Without an account, boards live in this browser and there is no live collaboration.
   const GUEST = document.body.dataset.guest === '1';
   const HOME_PATH = GUEST ? '/draw/' : '/';
   const LAST_KEY = GUEST ? 'sketchsaathi.guest.last' : 'sketchsaathi.last';
 
-  let boardId = null;          // uuid of the open board (null = not saved yet)
+  let boardId = null;
   let savedTitle = '';
-  let pages = [];              // tab list: [{ uuid, name, position, background }]
-  let pageId = null;           // uuid of the page on screen
+  let pages = [];
+  let pageId = null;
   let saveTimer = null;
 
   const setStatus = text => { $('status').textContent = text; };
   const escapeHtml = text => text.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
-  // Keep the address bar clean ("/"); remember the open board and page in this browser instead.
+  // keep the address bar clean; remember the open board in this browser instead
   function updateUrl() {
     if (location.pathname !== HOME_PATH || location.search) history.replaceState(null, '', HOME_PATH);
     try {
       if (boardId) localStorage.setItem(LAST_KEY, JSON.stringify({ board: boardId, page: pageId }));
       else localStorage.removeItem(LAST_KEY);
-    } catch { /* storage unavailable */ }
+    } catch {}
   }
 
   const shareLink = () => `${location.origin}/b/${boardId}/`;
 
-  // ---------- Saving ----------
   async function savePageNow() {
     clearTimeout(saveTimer);
     saveTimer = null;
@@ -51,14 +48,13 @@
 
   const flushSave = () => (saveTimer ? savePageNow() : Promise.resolve());
 
-  // Make sure the board exists on the server (it is created on first save / share / new page).
   async function ensureBoard() {
     if (boardId) return;
     const localName = pages[0] && pages[0].name;
     const board = await api.createBoard($('title').value || 'Untitled');
     setBoard(board);
     pageId = board.pages[0].uuid;
-    if (localName && localName !== pages[0].name) {          // a tab renamed before the first save
+    if (localName && localName !== pages[0].name) {
       pages[0].name = localName;
       await api.updatePage(pageId, { name: localName });
     }
@@ -83,7 +79,47 @@
     }
   }
 
-  // ---------- Boards ----------
+  async function saveToFile() {
+    try {
+      await flushSave();
+      const title = $('title').value || 'Untitled';
+      const list = await Promise.all(pages.map(async page => (
+        page.uuid === pageId
+          ? { name: page.name, background: canvas.getBackground(), elements: canvas.getElements() }
+          : api.getPage(page.uuid).then(full => ({ name: full.name, background: full.background, elements: full.elements }))
+      )));
+      const name = await fileIo.saveFile({ title, pages: list });
+      if (name) ui.toast(`Saved ${name}`, 'success');
+    } catch {
+      ui.toast('Could not save the file.', 'error');
+    }
+  }
+
+  async function openFromFile() {
+    let drawing;
+    try {
+      drawing = await fileIo.openFile();
+    } catch (error) {
+      return ui.toast(error.message, 'error', 5000);
+    }
+    if (!drawing) return;
+
+    try {
+      await flushSave();
+      const board = await api.createBoard(drawing.title);
+      const [first, ...rest] = drawing.pages;
+      await api.updatePage(board.pages[0].uuid, first);
+      for (const page of rest) {
+        const added = await api.addPage(board.uuid, page.name);
+        await api.updatePage(added.uuid, { elements: page.elements, background: page.background });
+      }
+      await openBoard(board.uuid);
+      ui.toast(`Opened "${drawing.title}"`, 'success');
+    } catch (error) {
+      ui.toast(GUEST ? error.message : 'Could not open that file.', 'error', 5000);
+    }
+  }
+
   function setBoard(board) {
     boardId = board.uuid;
     savedTitle = board.title;
@@ -169,7 +205,6 @@
     }
   }
 
-  // ---------- Pages (tabs) ----------
   async function loadPage(uuid) {
     const page = await api.getPage(uuid);
     pageId = uuid;
@@ -210,7 +245,7 @@
     if (!page || !name || name === page.name) return renderTabs();
     page.name = name;
     renderTabs();
-    if (!uuid) return;                       // unsaved board: kept locally until first save
+    if (!uuid) return;
     try {
       await api.updatePage(uuid, { name });
       collab.send({ type: 'pages' });
@@ -242,7 +277,6 @@
     }
   }
 
-  // Someone else added, renamed or deleted a page.
   async function refreshPages() {
     if (!boardId) return;
     const board = await api.getBoard(boardId);
@@ -310,7 +344,6 @@
 
   $('addPage').onclick = addPage;
 
-  // ---------- Menu ----------
   const menu = $('menu'), menuButton = $('menuButton');
   const toggleMenu = open => {
     menu.hidden = !open;
@@ -320,7 +353,9 @@
   document.addEventListener('pointerdown', e => {
     if (!menu.hidden && !menu.contains(e.target) && !menuButton.contains(e.target)) toggleMenu(false);
   });
-  $('save').onclick = () => { save(); toggleMenu(false); };
+  $('saveFile').onclick = () => { toggleMenu(false); saveToFile(); };
+  $('openFile').onclick = () => { toggleMenu(false); openFromFile(); };
+  $('title').addEventListener('change', () => { if (boardId) save(); });
   $('export').onclick = () => {
     const page = pages.find(p => p.uuid === pageId);
     canvas.exportPng(`${$('title').value || 'sketch'}${page ? ' - ' + page.name : ''}.png`);
@@ -331,7 +366,6 @@
   $('boards').onchange = e => { toggleMenu(false); e.target.value ? openBoard(e.target.value) : newBoard(); };
   $('share').onclick = share;
 
-  // ---------- Tools ----------
   let currentTool = 'pen';
   const MORE_TOOLS = ['frame', 'bucket', 'lasso'];
   const selectTool = name => {
@@ -342,8 +376,15 @@
     refreshPanel();
   };
   document.querySelectorAll('.tool[data-tool]').forEach(btn => btn.addEventListener('click', () => selectTool(btn.dataset.tool)));
+  canvas.on('toolchange', selectTool);
 
-  // ---------- More tools menu ----------
+  function setToolLock(on) {
+    canvas.setToolLock(on);
+    $('toolLock').setAttribute('aria-pressed', String(on));
+    $('toolLock').classList.toggle('active', on);
+  }
+  $('toolLock').onclick = () => setToolLock($('toolLock').getAttribute('aria-pressed') !== 'true');
+
   const moreMenu = $('moreMenu'), moreButton = $('moreButton');
   function toggleMore(open) {
     moreMenu.hidden = !open;
@@ -351,7 +392,7 @@
     if (!open) return;
     const r = moreButton.getBoundingClientRect();
     const height = moreMenu.offsetHeight, width = moreMenu.offsetWidth;
-    if (r.top > innerHeight - height - 20) {           // tool bar at the bottom (phones): open upwards
+    if (r.top > innerHeight - height - 20) {
       moreMenu.style.left = `${Math.max(10, Math.min(innerWidth - width - 10, r.left - width / 2))}px`;
       moreMenu.style.top = `${r.top - height - 10}px`;
     } else {
@@ -367,9 +408,8 @@
     if (!moreMenu.hidden && !moreMenu.contains(e.target) && !moreButton.contains(e.target)) toggleMore(false);
   });
 
-  // ---------- Images (file picker, paste, drag and drop) ----------
-  const MAX_IMAGE_CHARS = 350000;          // ~260 KB per image, so pages stay small enough to save
-  const PAGE_WARN_CHARS = 900000;          // the database currently accepts about 1 MB per save
+  const MAX_IMAGE_CHARS = 350000;
+  const PAGE_WARN_CHARS = 900000;
   const SUPPORTS_WEBP = document.createElement('canvas').toDataURL('image/webp').startsWith('data:image/webp');
 
   async function compressImage(file) {
@@ -388,7 +428,7 @@
         out.width = Math.max(1, Math.round(img.naturalWidth * k));
         out.height = Math.max(1, Math.round(img.naturalHeight * k));
         const c = out.getContext('2d');
-        if (!SUPPORTS_WEBP) { c.fillStyle = '#fff'; c.fillRect(0, 0, out.width, out.height); }   // JPEG has no transparency
+        if (!SUPPORTS_WEBP) { c.fillStyle = '#fff'; c.fillRect(0, 0, out.width, out.height); }
         c.drawImage(img, 0, 0, out.width, out.height);
         const src = out.toDataURL(SUPPORTS_WEBP ? 'image/webp' : 'image/jpeg', quality);
         if (src.length <= MAX_IMAGE_CHARS) return { src, width: out.width, height: out.height };
@@ -434,7 +474,6 @@
     addImageFile(file, true);
   });
 
-  // ---------- Frames ----------
   canvas.on('frameRename', async frame => {
     const name = await ui.prompt({ title: 'Rename frame', value: frame.name || 'Frame', confirmText: 'Rename' });
     if (name && name.trim()) canvas.renameFrame(frame.id, name.trim().slice(0, 60));
@@ -451,13 +490,11 @@
   }
   $('clearTool').onclick = clearPage;
 
-  // ---------- Properties panel ----------
-  // Shows the selected shape's style, or the style for the next shape when nothing is selected.
   const defaults = {
     color: '#1e1e1e', fill: '', size: 4, strokeStyle: 'solid', round: false, opacity: 1,
     fontFamily: 'hand', fontSize: 20, align: 'left',
   };
-  const target = () => canvas.getEditing() || canvas.getSelection();   // what the panel edits
+  const target = () => canvas.getEditing() || canvas.getSelection();
 
   function markActive(selector, match) {
     document.querySelectorAll(selector).forEach(el => el.classList.toggle('active', match(el)));
@@ -481,7 +518,6 @@
     $('opacityValue').textContent = opacity;
   }
 
-  // Text options for texts (or the Text tool), shape options for everything else.
   function refreshPanel() {
     const el = target();
     const list = canvas.getEditing() ? [canvas.getEditing()] : canvas.getSelectedList();
@@ -536,7 +572,6 @@
   document.querySelectorAll('#aligns .opt').forEach(btn =>
     btn.addEventListener('click', () => applyStyle({ align: btn.dataset.align })));
 
-  // While typing, clicking panel buttons restyles the text without ending the edit.
   document.querySelector('.style').addEventListener('mousedown', e => {
     if (canvas.getEditing() && !e.target.closest('input')) e.preventDefault();
   });
@@ -544,7 +579,6 @@
   canvas.on('select', refreshPanel);
   canvas.on('editing', refreshPanel);
 
-  // Phones: the properties panel is a sheet opened from the palette button.
   const stylePanel = document.querySelector('.style');
   function toggleStyleSheet(open) {
     stylePanel.classList.toggle('open', open);
@@ -552,7 +586,6 @@
   }
   $('styleToggle').onclick = () => toggleStyleSheet(!stylePanel.classList.contains('open'));
 
-  // ---------- Page background (saved with the page, shared live) ----------
   function showBackground(color) {
     canvas.setBackground(color);
     const preset = document.querySelector(`#backgrounds [data-bg="${color.toLowerCase()}"]`);
@@ -567,8 +600,7 @@
     dot.addEventListener('click', () => changeBackground(dot.dataset.bg)));
   $('bgColor').oninput = e => changeBackground(e.target.value);
 
-  // ---------- Theme and grid (remembered per browser) ----------
-  const remember = (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage unavailable */ } };
+  const remember = (key, value) => { try { localStorage.setItem(key, value); } catch {} };
   const recall = key => { try { return localStorage.getItem(key); } catch { return null; } };
 
   function setTheme(dark) {
@@ -589,7 +621,6 @@
   setTheme(savedTheme ? savedTheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches);
   setGrid(recall('sketchsaathi.grid') === '1');
 
-  // ---------- Zoom and history ----------
   $('zoomIn').onclick = () => canvas.zoomBy(1.2);
   $('zoomOut').onclick = () => canvas.zoomBy(1 / 1.2);
   $('zoomReset').onclick = () => canvas.zoomReset();
@@ -610,13 +641,11 @@
     $('redo').disabled = !canvas.canRedo();
   });
 
-  // ---------- Help dialog ----------
   const help = $('help');
   $('helpButton').onclick = () => help.showModal();
   help.querySelector('[data-close]').onclick = () => help.close();
-  help.addEventListener('click', e => { if (e.target === help) help.close(); });   // click on the backdrop
+  help.addEventListener('click', e => { if (e.target === help) help.close(); });
 
-  // ---------- Keyboard ----------
   const shortcuts = {
     h: 'hand', v: 'select', r: 'rectangle', d: 'diamond', o: 'ellipse', a: 'arrow',
     l: 'line', p: 'pen', t: 'text', e: 'eraser', x: 'eraser',
@@ -631,7 +660,8 @@
     const byKey = {
       z: () => (e.shiftKey ? canvas.redo() : canvas.undo()),
       y: () => canvas.redo(),
-      s: () => save(),
+      s: () => saveToFile(),
+      o: () => openFromFile(),
       d: () => canvas.duplicateSelected(),
       a: () => { selectTool('select'); canvas.selectAll(); },
       e: () => e.shiftKey && $('export').click(),
@@ -646,15 +676,19 @@
       Quote: () => setGrid($('gridState').textContent !== 'On'),
       PageUp: () => stepPage(-1), PageDown: () => stepPage(1),
     };
-    const action = byCode[e.code] || byKey[key];       // Ctrl+C / X / V fall through to the clipboard events
+    const action = byCode[e.code] || byKey[key];
     if (!action) return;
     e.preventDefault();
     action();
   }
 
   document.addEventListener('keydown', e => {
-    if (help.open) return;                             // the dialog closes itself on Escape
+    if (help.open) return;
     if (e.key === 'Escape') { toggleMenu(false); toggleMore(false); toggleStyleSheet(false); closeContextMenu(); canvas.clearSelection(); return; }
+    if (e.ctrlKey && !e.altKey && !e.shiftKey && (e.code === 'KeyS' || e.code === 'KeyO')) {
+      e.preventDefault();
+      return e.code === 'KeyS' ? saveToFile() : openFromFile();
+    }
     if (isTyping(e.target) || e.metaKey) return;
     if (e.ctrlKey && e.altKey && e.code === 'KeyN') { e.preventDefault(); return addPage(); }
     if (e.ctrlKey && e.altKey && e.code === 'KeyC') { e.preventDefault(); return copyStyles(); }
@@ -681,17 +715,17 @@
       return canvas.flipSelected(e.code === 'KeyH' ? 'x' : 'y');
     }
     if (e.key === '9') return $('imageFile').click();
+    if (e.code === 'KeyQ' && !e.shiftKey) return setToolLock($('toolLock').getAttribute('aria-pressed') !== 'true');
     const tool = shortcuts[e.key.toLowerCase()];
     if (tool) selectTool(tool);
   });
 
-  // ---------- Clipboard (works with Ctrl+C / Ctrl+X / Ctrl+V and the browser menu) ----------
   const CLIP_TYPE = 'sketchsaathi/elements';
   let pointerOnCanvas = false;
   $('canvas').addEventListener('pointerenter', () => { pointerOnCanvas = true; });
   $('canvas').addEventListener('pointerleave', () => { pointerOnCanvas = false; });
 
-  let lastCopied = null;                   // JSON of the last copied shapes
+  let lastCopied = null;
 
   function copyTo(e) {
     if (isTyping(document.activeElement)) return false;
@@ -714,11 +748,10 @@
     try {
       const data = JSON.parse(text);
       if (data && data.type === CLIP_TYPE) return canvas.pasteElements(data.elements, pointerOnCanvas);
-    } catch { /* not SketchSaathi shapes: paste as text */ }
+    } catch {}
     canvas.pasteText(text);
   });
 
-  // ---------- Right-click menu ----------
   const contextMenu = $('contextMenu');
   let copiedStyle = null;
 
@@ -726,13 +759,12 @@
     const list = canvas.copySelection();
     if (!list.length) return;
     lastCopied = JSON.stringify({ type: CLIP_TYPE, elements: list });
-    try { await navigator.clipboard.writeText(lastCopied); } catch { /* kept in memory */ }
+    try { await navigator.clipboard.writeText(lastCopied); } catch {}
     if (cut) canvas.deleteSelected();
     ui.toast(cut ? 'Cut' : 'Copied', 'success', 1400);
   }
 
   async function menuPaste() {
-    // The clipboard can stay silent while the browser waits on a permission decision, so don't wait long.
     const fromClipboard = navigator.clipboard && navigator.clipboard.readText
       ? navigator.clipboard.readText().catch(() => null) : Promise.resolve(null);
     const timeout = new Promise(resolve => setTimeout(() => resolve(null), 400));
@@ -741,7 +773,7 @@
     try {
       const data = JSON.parse(text);
       if (data && data.type === CLIP_TYPE) return canvas.pasteElements(data.elements, true);
-    } catch { /* plain text */ }
+    } catch {}
     canvas.pasteText(text);
   }
 
@@ -766,7 +798,7 @@
   }
 
   function closeContextMenu() {
-    if (contextMenu.contains(document.activeElement)) document.activeElement.blur();   // give keys back to the board
+    if (contextMenu.contains(document.activeElement)) document.activeElement.blur();
     contextMenu.hidden = true;
   }
 
@@ -846,8 +878,6 @@
   window.addEventListener('blur', closeContextMenu);
   window.addEventListener('resize', closeContextMenu);
 
-  // ---------- Live collaboration ----------
-  // Drawing events are tagged with the page they belong to.
   const sendDrawing = event => collab.send({ ...event, page: pageId });
 
   canvas.on('add', element => sendDrawing({ type: 'add', element }));
@@ -861,10 +891,9 @@
 
   collab.onState(setStatus);
   collab.onEvent(event => {
-    if (event.type === 'join') collab.send({ type: 'hello' });   // let the newcomer know we're here
+    if (event.type === 'join') collab.send({ type: 'hello' });
     if (event.type === 'pages') return refreshPages();
     if (event.page && event.page !== pageId) {
-      // Activity on another page: count the person as present, but don't draw it here.
       if (event.type === 'cursor') presence.handle({ ...event, type: 'hello' });
       return;
     }
@@ -876,7 +905,6 @@
     if (!presence.handle(event)) canvas.applyRemote(event);
   });
 
-  // Save any pending edit before the tab closes.
   window.addEventListener('beforeunload', () => {
     if (saveTimer && pageId) {
       fetch(`/api/pages/${pageId}/`, {
@@ -892,18 +920,16 @@
     }
   });
 
-  // ---------- Start ----------
-  SketchSaathi.ready = true;                   // everything above is wired up
-  // Read the address before newBoard() cleans it.
+  SketchSaathi.ready = true;
   const params = new URLSearchParams(location.search);
   const sharedBoard = (location.pathname.match(/^\/b\/([0-9a-f-]{36})\/?$/i) || [])[1];
   let last = null;
-  try { last = JSON.parse(localStorage.getItem(LAST_KEY) || 'null'); } catch { /* ignore */ }
+  try { last = JSON.parse(localStorage.getItem(LAST_KEY) || 'null'); } catch {}
   canvas.resize();
   refreshPanel();
   newBoard();
 
-  // Sketches made without an account move into the account on the first visit after signing in.
+  // sketches made without an account move into the account on first login
   async function importGuestWork() {
     const boards = SketchSaathi.localStore.boardsWithContent();
     if (!boards.length) { SketchSaathi.localStore.clear(); return null; }
@@ -939,7 +965,7 @@
     }
     if (last && last.board) {
       return openBoard(last.board, last.page).catch(() => {
-        try { localStorage.removeItem(LAST_KEY); } catch { /* ignore */ }
+        try { localStorage.removeItem(LAST_KEY); } catch {}
       });
     }
     if (GUEST) ui.toast('You’re sketching without an account – your work is saved in this browser.', 'info', 4500);

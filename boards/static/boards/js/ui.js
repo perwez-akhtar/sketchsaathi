@@ -1,4 +1,3 @@
-// Styled dialogs and toast notifications, used instead of the browser's alert / confirm / prompt.
 window.SketchSaathi = window.SketchSaathi || {};
 
 SketchSaathi.ui = (() => {
@@ -22,7 +21,6 @@ SketchSaathi.ui = (() => {
     return el;
   }
 
-  // Small notification at the bottom of the screen. kind: 'success' | 'error' | 'info'
   function toast(message, kind = 'info', duration = 2600) {
     const el = document.createElement('div');
     el.className = `toast ${kind}`;
@@ -34,11 +32,10 @@ SketchSaathi.ui = (() => {
     setTimeout(() => {
       el.classList.remove('show');
       el.addEventListener('transitionend', () => el.remove(), { once: true });
-      setTimeout(() => el.remove(), 400);          // in case no transition runs
+      setTimeout(() => el.remove(), 400);
     }, duration);
   }
 
-  // Modal dialog. Resolves with true / the typed value, or null when cancelled.
   function dialog({ title, message = '', confirmText = 'OK', cancelText = 'Cancel', danger = false, input = null }) {
     return new Promise(resolve => {
       const box = document.createElement('dialog');
@@ -65,7 +62,7 @@ SketchSaathi.ui = (() => {
       const close = value => { result = value; box.close(); };
       box.querySelector('.ui-cancel').onclick = () => close(null);
       box.querySelector('.ui-confirm').onclick = () => close(field ? field.value : true);
-      box.addEventListener('click', e => { if (e.target === box) close(null); });       // backdrop
+      box.addEventListener('click', e => { if (e.target === box) close(null); });
       box.addEventListener('keydown', e => {
         e.stopPropagation();
         if (e.key === 'Enter') { e.preventDefault(); close(field ? field.value : true); }

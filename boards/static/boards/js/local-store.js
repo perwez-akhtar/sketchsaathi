@@ -1,7 +1,6 @@
-// Boards kept in this browser (localStorage) for visitors without an account.
-// It offers the same calls as SketchSaathi.api, so the app works the same way in both modes.
 window.SketchSaathi = window.SketchSaathi || {};
 
+// same calls as SketchSaathi.api, but saved in this browser for visitors without an account
 SketchSaathi.localStore = (() => {
   const KEY = 'sketchsaathi.guest';
   const newId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
@@ -105,8 +104,6 @@ SketchSaathi.localStore = (() => {
       return null;
     },
 
-    // ---------- Moving guest work into an account ----------
-    // Boards that have something drawn on them, oldest first.
     boardsWithContent() {
       return Object.values(read().boards)
         .filter(board => board.pages.some(page => page.elements.length))
@@ -114,12 +111,11 @@ SketchSaathi.localStore = (() => {
         .map(copy);
     },
     clear() {
-      try { localStorage.removeItem(KEY); localStorage.removeItem('sketchsaathi.guest.last'); } catch { /* ignore */ }
+      try { localStorage.removeItem(KEY); localStorage.removeItem('sketchsaathi.guest.last'); } catch {}
     },
   };
 })();
 
-// Guests use the browser store; signed-in users use the server.
 if (document.body.dataset.guest === '1') {
   SketchSaathi.serverApi = SketchSaathi.api;
   SketchSaathi.api = SketchSaathi.localStore;

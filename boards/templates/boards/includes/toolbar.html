@@ -1,4 +1,3 @@
-<!-- Main menu (top-left) -->
 <div class="menu-wrap">
   <button id="menuButton" class="icon-btn float" aria-label="Menu" aria-expanded="false" title="Menu">
     <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
@@ -10,7 +9,8 @@
     <label class="field">Open board
       <select id="boards"><option value="">New board</option></select>
     </label>
-    <button id="save" class="item">Save<kbd>Ctrl+S</kbd></button>
+    <button id="saveFile" class="item">Save to file…<kbd>Ctrl+S</kbd></button>
+    <button id="openFile" class="item">Open file…<kbd>Ctrl+O</kbd></button>
     <button id="export" class="item">Export page as PNG</button>
     <button id="fit" class="item">Zoom to fit<kbd>Shift+1</kbd></button>
     <button id="grid" class="item">Show grid<kbd id="gridState">Off</kbd></button>
@@ -30,8 +30,12 @@
   </div>
 </div>
 
-<!-- Tools (left rail) -->
 <nav class="toolbar floating" aria-label="Drawing tools">
+  <button class="tool" id="toolLock" aria-pressed="false" title="Keep the tool active after drawing (Q)">
+    <svg class="unlocked" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 017.6-1.7"/></svg>
+    <svg class="locked" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+  </button>
+  <span class="divider"></span>
   <button class="tool" data-tool="hand" title="Hand – move canvas (H)">
     <svg viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 013 0V12m0-1.5v-6a1.5 1.5 0 013 0V12m0-5.5a1.5 1.5 0 013 0V13m0-3.5a1.5 1.5 0 013 0V15a6 6 0 01-6 6h-1.5a6 6 0 01-5-2.7L5 14.5a1.5 1.5 0 012.5-1.6L8 14"/></svg><sub>H</sub>
   </button>
@@ -75,7 +79,6 @@
   </button>
 </nav>
 
-<!-- More tools (opens next to the ⋯ button) -->
 <div id="moreMenu" class="panel more-menu" role="menu" hidden>
   <button class="more-item" role="menuitem" id="insertImage">
     <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg>
@@ -96,7 +99,6 @@
 </div>
 <input type="file" id="imageFile" accept="image/*" hidden>
 
-<!-- Properties (right). Applies to the selected shape, or to the next one you draw. -->
 <aside class="panel style" aria-label="Properties">
   <div class="label">Stroke</div>
   <div class="colors" id="colors">
@@ -109,7 +111,6 @@
   </div>
   <label class="hex"><span>#</span><input id="hex" value="1e1e1e" maxlength="6" spellcheck="false" aria-label="Stroke hex colour"></label>
 
-  <!-- Text options: shown for a selected text or while the Text tool is active -->
   <div id="textProps" class="section" hidden>
     <div class="label">Font family</div>
     <div class="options" id="fontFamilies">
@@ -132,7 +133,6 @@
     </div>
   </div>
 
-  <!-- Shape options -->
   <div id="shapeProps" class="section">
   <div class="label">Fill</div>
   <div class="colors" id="fills">
@@ -193,7 +193,6 @@
   </div>
 </aside>
 
-<!-- Share, people, theme (top-right) -->
 <div class="top-right">
   <div id="people" class="people" aria-label="People on this board"></div>
   <span id="status" role="status"></span>
@@ -207,7 +206,6 @@
   <button id="share" class="share">Share</button>
 </div>
 
-<!-- Page tabs (bottom-left) -->
 <div class="pages floating" aria-label="Pages">
   <div id="tabs" class="tabs" role="tablist"></div>
   <button id="addPage" class="add-page" title="New page (Ctrl+Alt+N)" aria-label="New page">+</button>
@@ -215,7 +213,6 @@
 
 <button id="scrollBack" class="scroll-back" hidden>Scroll back to content</button>
 
-<!-- Zoom and history (bottom-right) -->
 <div class="bottom-controls">
   <div class="pill zoom-pill">
     <button id="zoomOut" aria-label="Zoom out" title="Zoom out">−</button>
@@ -239,7 +236,6 @@
   </div>
 </div>
 
-<!-- Keyboard shortcuts -->
 <dialog id="help" class="panel help">
   <header>
     <h2>Keyboard shortcuts</h2>
@@ -265,6 +261,7 @@
         <dt>Bucket fill</dt><dd><kbd>B</kbd></dd>
         <dt>Lasso selection</dt><dd><kbd>Shift L</kbd></dd>
         <dt>Straight / square / circle</dt><dd>hold <kbd>Shift</kbd></dd>
+        <dt>Keep tool after drawing</dt><dd><kbd>Q</kbd></dd>
         <dt>Move canvas</dt><dd>hold <kbd>Space</kbd> and drag</dd>
       </dl>
     </section>
@@ -298,7 +295,8 @@
         <dt>Zoom to fit</dt><dd><kbd>Shift 1</kbd></dd>
         <dt>Toggle grid</dt><dd><kbd>Ctrl '</kbd></dd>
         <dt>Dark mode</dt><dd><kbd>Alt Shift D</kbd></dd>
-        <dt>Save</dt><dd><kbd>Ctrl S</kbd></dd>
+        <dt>Save to file</dt><dd><kbd>Ctrl S</kbd></dd>
+        <dt>Open file</dt><dd><kbd>Ctrl O</kbd></dd>
         <dt>Export PNG</dt><dd><kbd>Ctrl Shift E</kbd></dd>
         <dt>New page</dt><dd><kbd>Ctrl Alt N</kbd></dd>
         <dt>Previous / next page</dt><dd><kbd>Ctrl PgUp</kbd> / <kbd>Ctrl PgDn</kbd></dd>
@@ -308,7 +306,6 @@
   </div>
 </dialog>
 
-<!-- Welcome hint (shown while the page is empty) -->
 <div id="welcome" class="welcome">
   <div class="hint hint-tools">Pick a tool &amp;<br>start drawing!</div>
   <h2 class="logo">Co<span>Sketch</span></h2>
@@ -321,5 +318,4 @@
 
 <div id="cursors" class="cursors" aria-hidden="true"></div>
 
-<!-- Right-click menu (filled in by app.js) -->
 <div id="contextMenu" class="panel context-menu" role="menu" hidden></div>

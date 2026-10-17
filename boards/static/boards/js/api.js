@@ -1,4 +1,3 @@
-// Thin wrapper around the REST API. Boards and pages are addressed by uuid.
 window.SketchSaathi = window.SketchSaathi || {};
 
 SketchSaathi.api = (() => {
@@ -24,7 +23,6 @@ SketchSaathi.api = (() => {
   const send = (method, url, body) => request(url, { method, body: JSON.stringify(body) });
 
   return {
-    // Boards
     async listBoards() {
       return (await request('/api/boards/?ordering=-updated_at')).results;
     },
@@ -33,7 +31,6 @@ SketchSaathi.api = (() => {
     renameBoard: (uuid, title) => send('PATCH', `/api/boards/${uuid}/`, { title }),
     deleteBoard: uuid => request(`/api/boards/${uuid}/`, { method: 'DELETE' }),
 
-    // Pages (tabs)
     addPage: (boardUuid, name) => send('POST', `/api/boards/${boardUuid}/pages/`, { name }),
     getPage: uuid => request(`/api/pages/${uuid}/`),
     updatePage: (uuid, changes) => send('PATCH', `/api/pages/${uuid}/`, changes),

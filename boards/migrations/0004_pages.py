@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 
 def move_drawings_to_pages(apps, schema_editor):
-    """Each existing board keeps its drawing as its first page."""
+    # every existing board keeps its drawing as Page 1
     Board = apps.get_model('boards', 'Board')
     Page = apps.get_model('boards', 'Page')
     for board in Board.objects.all():
@@ -24,7 +24,6 @@ def move_pages_back(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('boards', '0003_board_background'),
     ]

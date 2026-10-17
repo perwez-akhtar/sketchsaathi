@@ -1,4 +1,3 @@
-// Canvas drawing: tools, pan/zoom, selection (move / resize / restyle), text and rendering.
 window.SketchSaathi = window.SketchSaathi || {};
 
 SketchSaathi.canvas = (() => {
@@ -7,6 +6,7 @@ SketchSaathi.canvas = (() => {
   const listeners = {
     add: [], update: [], remove: [], clear: [], order: [],
     change: [], render: [], view: [], cursor: [], select: [], editing: [], laser: [], frameRename: [], contextmenu: [],
+    toolchange: [],
   };
   const MIN_SCALE = 0.1, MAX_SCALE = 8;
   const CLOSED = ['rectangle', 'diamond', 'ellipse'];
@@ -18,42 +18,41 @@ SketchSaathi.canvas = (() => {
   };
   const TEXT_KEYS = ['fontFamily', 'fontSize', 'align'];
   const ACCENT = '#0d9488';
-  const HANDLE = 8;                         // resize handle size, in screen pixels
-  const BOXED = ['rectangle', 'text', 'image', 'frame'];   // shapes whose outline is their box
-  const LASER_MS = 1000;                    // how long a laser trail stays visible
-  const FRAME_LABEL = 14;                   // frame name size, in board units
+  const HANDLE = 8;
+  const BOXED = ['rectangle', 'text', 'image', 'frame'];
+  const LASER_MS = 1000;
+  const FRAME_LABEL = 14;
 
   let elements = [];
-  let current = null;                       // element being drawn, or a gesture (pan / erase / move / resize)
+  let current = null;
   let tool = 'pen';
   const style = {
     color: '#1e1e1e', fill: '', size: 4, strokeStyle: 'solid', round: false, opacity: 1,
     fontFamily: 'hand', fontSize: 20, align: 'left',
   };
-  let editing = null;                       // { el, box, original } while a text is being typed
+  let editing = null;
+  let toolLocked = false;
   let view = { x: 0, y: 0, scale: 1 };
   let selectedIds = new Set();
-  let pointer = [0, 0];                     // last pointer position on the board (paste target)
-  const images = new Map();                 // src -> HTMLImageElement
-  const lasers = new Map();                 // who -> { color, strokes: [[{ x, y, t }]] }
+  let pointer = [0, 0];
+  const images = new Map();
+  const lasers = new Map();
   let laserFrame = null;
   let spaceDown = false;
   let showGrid = false;
   let background = '#ffffff';
   let lastCursorSent = 0;
 
-  // ---------- Undo history (this user's own actions only) ----------
-  // A step is a list of changes: { id, before, after, index } (copies, or null when the shape didn't exist)
-  // or { order: { before, after } } for a layer reorder.
+  // one step = the changes made by one action; only our own edits are tracked
   const HISTORY_LIMIT = 200;
   const history = [];
   const future = [];
-  let batch = null;                         // collects the changes of one action that touches several shapes
+  let batch = null;
 
   const emit = (name, payload) => listeners[name].forEach(fn => fn(payload));
   const newId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
   const dpr = () => window.devicePixelRatio || 1;
-  const fontPx = el => el.fontSize || 14 + (el.size || 4) * 3;     // older texts derived size from stroke width
+  const fontPx = el => el.fontSize || 14 + (el.size || 4) * 3;
   const fontCss = el => `${fontPx(el)}px ${FONTS[el.fontFamily] || FONTS.hand}`;
   const clone = el => JSON.parse(JSON.stringify(el));
   const snapshot = list => new Map(list.map(el => [el.id, clone(el)]));
@@ -80,7 +79,6 @@ SketchSaathi.canvas = (() => {
     beginBatch();
     try { return fn(); } finally { endBatch(); }
   }
-  // Record edits to existing shapes, given copies taken before the edit.
   function recordUpdates(before, list) {
     inBatch(() => list.forEach(el => {
       const old = before.get(el.id), now = clone(el);
@@ -88,10 +86,9 @@ SketchSaathi.canvas = (() => {
     }));
   }
   const selectedList = () => elements.filter(el => selectedIds.has(el.id));
-  const selected = () => selectedList()[0] || null;          // first selected shape (drives the panel)
+  const selected = () => selectedList()[0] || null;
   const single = () => { const list = selectedList(); return list.length === 1 ? list[0] : null; };
 
-  // Accepts one id, a list of ids, or null.
   function setSelected(ids) {
     const next = new Set(ids == null ? [] : Array.isArray(ids) ? ids : [ids]);
     if (next.size === selectedIds.size && [...next].every(id => selectedIds.has(id))) return;
@@ -106,10 +103,7 @@ SketchSaathi.canvas = (() => {
              height: Math.max(...boxes.map(b => b.y + b.height)) - y };
   }
 
-  // ---------- Geometry ----------
-  // Lines of a text. With a fixed `boxWidth` (drawn or dragged by the user) words wrap inside it.
-  const textCache = new Map();               // layout key -> { lines, width }
-  // Fonts load after the page starts; re-measure text once they arrive.
+  const textCache = new Map();
   if (document.fonts) {
     document.fonts.addEventListener('loadingdone', () => { textCache.clear(); render(); if (editing) styleEditor(); });
   }
@@ -141,7 +135,7 @@ SketchSaathi.canvas = (() => {
       paragraph.split(/(\s+)/).forEach(word => {
         const next = line + word;
         if (fits(next) || !line.trim()) { line = next; } else { lines.push(line.trimEnd()); line = word.trimStart(); }
-        while (!fits(line) && line.length > 1) {          // a single word longer than the box
+        while (!fits(line) && line.length > 1) {
           let cut = line.length - 1;
           while (cut > 1 && !fits(line.slice(0, cut))) cut--;
           lines.push(line.slice(0, cut));
@@ -200,12 +194,11 @@ SketchSaathi.canvas = (() => {
     return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
   }
 
-  // Is the point on (or, for text and filled shapes, inside) the element?
   function pick(el, x, y) {
     const reach = (8 + (el.size || 2) / 2) / view.scale;
     const inBox = (b, pad = 0) => x >= b.x - pad && x <= b.x + b.width + pad && y >= b.y - pad && y <= b.y + b.height + pad;
     if (el.type === 'image') return inBox(bounds(el));
-    if (el.type === 'frame') {                           // its edges or its name label
+    if (el.type === 'frame') {
       const b = bounds(el);
       const label = { x: b.x, y: b.y - FRAME_LABEL * 1.6, width: Math.max(60, (el.name || '').length * 8), height: FRAME_LABEL * 1.6 };
       if (inBox(label)) return true;
@@ -223,7 +216,6 @@ SketchSaathi.canvas = (() => {
   const topmostAt = (x, y, includeLocked = false) =>
     [...elements].reverse().find(el => (includeLocked || !el.locked) && pick(el, x, y));
 
-  // Shift while drawing: square / circle for shapes, 15-degree steps for lines and arrows.
   function constrain(type, w, h) {
     if (type === 'line' || type === 'arrow') {
       const step = Math.PI / 12;
@@ -240,7 +232,6 @@ SketchSaathi.canvas = (() => {
     else { el.x += dx; el.y += dy; }
   }
 
-  // Selection box (with padding) and its corner handles, in board coordinates.
   function selectionBox(el) {
     const b = bounds(el), pad = 6 / view.scale;
     return { x: b.x - pad, y: b.y - pad, width: b.width + pad * 2, height: b.height + pad * 2 };
@@ -253,7 +244,6 @@ SketchSaathi.canvas = (() => {
     };
   }
 
-  // Corner handles scale; texts also get side handles that change the wrap width.
   function handles(el) {
     const box = selectionBox(el);
     const all = corners(box);
@@ -273,7 +263,6 @@ SketchSaathi.canvas = (() => {
     return found ? found[0] : null;
   }
 
-  // Scale `original` from box `from` into box `to`, writing the result into `el`.
   function resizeInto(el, original, from, to) {
     const sx = from.width ? to.width / from.width : 1;
     const sy = from.height ? to.height / from.height : 1;
@@ -291,7 +280,6 @@ SketchSaathi.canvas = (() => {
     }
   }
 
-  // ---------- Rendering ----------
   function dashFor(el) {
     const w = el.size || 2;
     if (el.strokeStyle === 'dashed') return [w * 3, w * 2.5];
@@ -300,7 +288,6 @@ SketchSaathi.canvas = (() => {
   }
 
   function roundedPolygon(c, points, radius) {
-    // points: closed polygon (first point repeated at the end)
     const pts = points.slice(0, -1);
     const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
     c.moveTo(...mid(pts[pts.length - 1], pts[0]));
@@ -351,7 +338,7 @@ SketchSaathi.canvas = (() => {
       const px = fontPx(el);
       const box = textBox(el);
       c.font = fontCss(el);
-      c.textBaseline = 'middle';                         // centred in each 1.25 line, like the typing box
+      c.textBaseline = 'middle';
       wrapLines(el).forEach((line, i) => {
         const gap = box.width - c.measureText(line).width;
         const dx = el.align === 'center' ? gap / 2 : el.align === 'right' ? gap : 0;
@@ -363,7 +350,7 @@ SketchSaathi.canvas = (() => {
 
     c.beginPath();
     if (el.type === 'pen') {
-      if (el.points.length === 1) {                       // a single click draws a dot
+      if (el.points.length === 1) {
         c.moveTo(el.points[0][0], el.points[0][1]);
         c.lineTo(el.points[0][0] + 0.01, el.points[0][1]);
       } else {
@@ -389,7 +376,7 @@ SketchSaathi.canvas = (() => {
     if (el.fill && CLOSED.includes(el.type)) { c.fillStyle = el.fill; c.fill(); }
     c.stroke();
 
-    if (el.type === 'arrow' && (el.width || el.height)) {   // arrow head (always solid)
+    if (el.type === 'arrow' && (el.width || el.height)) {
       c.setLineDash([]);
       const angle = Math.atan2(el.height, el.width);
       const head = 10 + (el.size || 2) * 2;
@@ -420,7 +407,6 @@ SketchSaathi.canvas = (() => {
     lasers.forEach(({ color, strokes }) => {
       strokes.forEach(stroke => {
         while (stroke.length && now - stroke[0].t > LASER_MS) stroke.shift();
-        // Coloured beam that thins and fades towards the tail (butt caps, so segments don't overlap into beads).
         for (let i = 1; i < stroke.length; i++) {
           const life = Math.max(0, 1 - (now - stroke[i].t) / LASER_MS);
           ctx.save();
@@ -436,7 +422,6 @@ SketchSaathi.canvas = (() => {
           ctx.stroke();
           ctx.restore();
         }
-        // Bright core drawn as one continuous line keeps it crisp.
         if (stroke.length > 1) {
           ctx.save();
           ctx.globalAlpha = Math.max(0, 1 - (now - stroke[stroke.length - 1].t) / LASER_MS) * 0.9;
@@ -472,7 +457,6 @@ SketchSaathi.canvas = (() => {
     return inside;
   }
 
-  // Draw `list` onto a new canvas, cropped to its contents, on the page background.
   function renderToCanvas(list, pad = 24) {
     const boxes = list.map(bounds);
     const minX = Math.min(...boxes.map(b => b.x)) - pad, minY = Math.min(...boxes.map(b => b.y)) - pad;
@@ -509,7 +493,7 @@ SketchSaathi.canvas = (() => {
       ctx.strokeRect(Math.min(ax, bx), ay, Math.abs(bx - ax), fontPx(style) * 1.25);
       ctx.restore();
     }
-    if (current && current.lasso) {                      // free-form selection path
+    if (current && current.lasso) {
       ctx.save();
       ctx.strokeStyle = ACCENT;
       ctx.fillStyle = 'rgba(13, 148, 136, .06)';
@@ -522,7 +506,7 @@ SketchSaathi.canvas = (() => {
       ctx.stroke();
       ctx.restore();
     }
-    if (current && current.marquee) {                    // drag-to-select rectangle
+    if (current && current.marquee) {
       const [ax, ay] = current.marquee, [bx, by] = current.to;
       ctx.save();
       ctx.fillStyle = 'rgba(13, 148, 136, .08)';
@@ -537,7 +521,7 @@ SketchSaathi.canvas = (() => {
     ctx.save();
     ctx.strokeStyle = ACCENT;
     ctx.lineWidth = unit;
-    if (list.length > 1) {                               // each shape, plus a dashed box around the group
+    if (list.length > 1) {
       list.forEach(el => { const b = selectionBox(el); ctx.strokeRect(b.x, b.y, b.width, b.height); });
       const pad = 10 * unit, g = unionBox(list);
       ctx.setLineDash([5 * unit, 4 * unit]);
@@ -560,14 +544,23 @@ SketchSaathi.canvas = (() => {
     ctx.restore();
   }
 
-  // Many changes can happen between two screen refreshes (every pointer event, every remote edit);
-  // render() just asks for one redraw on the next frame.
   let frameRequest = null;
   function render() {
     if (frameRequest === null) frameRequest = requestAnimationFrame(() => { frameRequest = null; draw(); });
   }
 
+  // the pixel density can change without a resize event, so re-check before every draw
+  function syncSize() {
+    const k = dpr();
+    const width = Math.round(canvas.clientWidth * k), height = Math.round(canvas.clientHeight * k);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+  }
+
   function draw() {
+    syncSize();
     const k = dpr();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -581,13 +574,11 @@ SketchSaathi.canvas = (() => {
   }
 
   function resize() {
-    const k = dpr();
-    canvas.width = Math.round(canvas.clientWidth * k);
-    canvas.height = Math.round(canvas.clientHeight * k);
-    draw();                                     // resizing clears the canvas, so redraw straight away
+    draw();
   }
+  if (window.ResizeObserver) new ResizeObserver(() => { draw(); if (editing) styleEditor(); }).observe(canvas);
 
-  let viewAnimation = null;                  // { target, frame } while a zoom animates
+  let viewAnimation = null;
 
   function setView(next, animating = false) {
     if (!animating && viewAnimation) { cancelAnimationFrame(viewAnimation.frame); viewAnimation = null; }
@@ -597,14 +588,12 @@ SketchSaathi.canvas = (() => {
     emit('view', view);
   }
 
-  // Glide to a new view (zoom buttons, shortcuts, zoom to fit).
   function animateView(target, duration = 220) {
     if (viewAnimation) cancelAnimationFrame(viewAnimation.frame);
     const from = { ...view }, start = performance.now();
     const ease = t => 1 - Math.pow(1 - t, 3);
     const step = now => {
       const t = Math.min(1, (now - start) / duration), k = ease(t);
-      // interpolate the scale geometrically so zooming feels even
       const scale = from.scale * Math.pow(target.scale / from.scale, k);
       const mix = (a, b) => a + (b - a) * k;
       setView({ scale, x: mix(from.x, target.x), y: mix(from.y, target.y) }, true);
@@ -615,7 +604,7 @@ SketchSaathi.canvas = (() => {
   }
 
   function zoomAt(factor, cx, cy, animate = false) {
-    const base = viewAnimation ? viewAnimation.target : view;     // repeated presses build on each other
+    const base = viewAnimation ? viewAnimation.target : view;
     const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, base.scale * factor));
     const ratio = scale / base.scale;
     const next = { scale, x: cx - (cx - base.x) * ratio, y: cy - (cy - base.y) * ratio };
@@ -644,6 +633,7 @@ SketchSaathi.canvas = (() => {
     emit('change');
   }
 
+  // apply one history step forwards (redo) or backwards (undo)
   function applyStep(changes, undoing) {
     let reordered = false;
     (undoing ? [...changes].reverse() : changes).forEach(change => {
@@ -663,7 +653,7 @@ SketchSaathi.canvas = (() => {
       if (index >= 0) {
         elements[index] = copy;
         emit('update', copy);
-      } else {                                  // bring it back where it was in the layer order
+      } else {
         const at = change.index ?? (copy.type === 'frame' ? 0 : elements.length);
         elements.splice(Math.min(at, elements.length), 0, copy);
         emit('add', copy);
@@ -689,7 +679,6 @@ SketchSaathi.canvas = (() => {
     return el;
   }
 
-  // ---------- Text editing ----------
   function styleEditor() {
     const { el, box } = editing;
     const r = canvas.getBoundingClientRect();
@@ -715,8 +704,6 @@ SketchSaathi.canvas = (() => {
     box.rows = lines.length;
   }
 
-  // Type a new text at (wx, wy), or edit `existing` in place.
-  // Like Excalidraw: Enter adds a line; Escape, Ctrl+Enter or clicking away finishes.
   function startText(wx, wy, existing, boxWidth = 0) {
     if (editing) editing.box.blur();
     const el = existing || newElement('text', { x: wx, y: wy, text: '' });
@@ -744,10 +731,10 @@ SketchSaathi.canvas = (() => {
       box.remove();
       emit('editing', null);
       if (!existing) {
-        if (text) { el.text = text; addElement(el); }
+        if (text) { el.text = text; addElement(el); selectAfterDrawing(el); }
         return render();
       }
-      if (!text) {                                    // emptied text is deleted (undo brings back the original)
+      if (!text) {
         Object.assign(el, session.original);
         return removeElement(el.id);
       }
@@ -771,7 +758,6 @@ SketchSaathi.canvas = (() => {
     });
   }
 
-  // ---------- Pointer input ----------
   function screenPoint(e) {
     const r = canvas.getBoundingClientRect();
     return [e.clientX - r.left, e.clientY - r.top];
@@ -785,14 +771,14 @@ SketchSaathi.canvas = (() => {
   const RESIZE_CURSOR = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', e: 'ew-resize', w: 'ew-resize' };
   const OPPOSITE = { nw: 'se', se: 'nw', ne: 'sw', sw: 'ne' };
 
-  // Touch: two fingers pinch to zoom and drag to pan. A second finger cancels a stroke in progress.
-  const touches = new Map();                // pointerId -> [x, y] on screen
+  const touches = new Map();
   function pinchState() {
     const [a, b] = [...touches.values()];
     return { distance: Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] };
   }
+  // two fingers pinch to zoom; a second finger cancels a half-drawn stroke
   function startPinch() {
-    if (current && current.type) current = null;                // drop the half-drawn shape
+    if (current && current.type) current = null;
     else if (current && !current.pinch) finish();
     const { distance, mid } = pinchState();
     current = { pinch: true, distance, mid, view: { ...view } };
@@ -809,8 +795,7 @@ SketchSaathi.canvas = (() => {
 
   canvas.addEventListener('pointerdown', e => {
     if (e.pointerType === 'touch') {
-      // The first finger of a new touch starts fresh: forget fingers whose "lifted" event never arrived,
-      // otherwise one finger would be mistaken for a pinch.
+      // a new first finger starts fresh, in case an earlier touch never reported lifting
       if (e.isPrimary) {
         touches.clear();
         if (current && current.pinch) current = null;
@@ -819,7 +804,7 @@ SketchSaathi.canvas = (() => {
       if (touches.size === 2) return startPinch();
       if (touches.size > 2) return;
     }
-    try { canvas.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
     if (tool === 'hand' || spaceDown || e.button === 1) {
       current = { panning: true, from: screenPoint(e), origin: { ...view } };
       canvas.classList.add('panning');
@@ -841,20 +826,19 @@ SketchSaathi.canvas = (() => {
         return;
       }
       const hit = topmostAt(x, y);
-      const additive = e.shiftKey || e.ctrlKey || e.metaKey;   // Shift / Ctrl + click adds to the selection
-      if (!hit) {                                         // empty canvas: drag a selection box
+      const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+      if (!hit) {
         const base = additive ? [...selectedIds] : [];
         setSelected(base);
         current = { marquee: [x, y], to: [x, y], base };
         return render();
       }
-      if (additive && selectedIds.has(hit.id)) {          // ... and toggles a selected shape off
+      if (additive && selectedIds.has(hit.id)) {
         setSelected([...selectedIds].filter(id => id !== hit.id));
         return render();
       }
       if (additive) setSelected([...selectedIds, hit.id]);
       else if (!selectedIds.has(hit.id)) setSelected(hit.id);
-      // Moving a frame also moves everything inside it.
       const moving = selectedList();
       moving.filter(el => el.type === 'frame').forEach(frame => {
         const f = bounds(frame);
@@ -880,7 +864,7 @@ SketchSaathi.canvas = (() => {
       current = { lasso: [[x, y]], base };
       return render();
     }
-    if (tool === 'bucket') {                             // fill a shape (or recolour a line / text)
+    if (tool === 'bucket') {
       const hit = topmostAt(x, y);
       if (!hit) return;
       const before = snapshot([hit]);
@@ -895,12 +879,12 @@ SketchSaathi.canvas = (() => {
     }
     if (tool === 'eraser') {
       current = { erasing: true };
-      beginBatch();                             // one eraser stroke = one undo step
+      beginBatch();
       const hit = topmostAt(x, y);
       if (hit) removeElement(hit.id);
       return;
     }
-    if (tool === 'text') {                      // the box opens on pointer-up, so the click can't steal its focus
+    if (tool === 'text') {
       const hit = topmostAt(x, y);
       current = hit && hit.type === 'text' ? { editText: hit } : { textAt: [x, y], to: [x, y] };
       return;
@@ -928,7 +912,7 @@ SketchSaathi.canvas = (() => {
     const now = performance.now();
     if (now - lastCursorSent > 50) { lastCursorSent = now; emit('cursor', [x, y]); }
 
-    if (!current) {                             // hover feedback for the select tool
+    if (!current) {
       if (tool === 'select') {
         const handle = handleAt(x, y);
         canvas.style.cursor = handle ? RESIZE_CURSOR[handle] : (topmostAt(x, y) ? 'move' : '');
@@ -958,7 +942,7 @@ SketchSaathi.canvas = (() => {
       const min = 2 / view.scale;
       let w = Math.max(min, Math.abs(x - ax)), h = Math.max(min, Math.abs(y - ay));
       if ((e.shiftKey || ['text', 'image'].includes(current.original.type)) && from.width && from.height) {
-        const k = Math.max(w / from.width, h / from.height);      // keep proportions
+        const k = Math.max(w / from.width, h / from.height);
         [w, h] = [from.width * k, from.height * k];
       }
       const to = { x: x < ax ? ax - w : ax, y: y < ay ? ay - h : ay, width: w, height: h };
@@ -966,7 +950,7 @@ SketchSaathi.canvas = (() => {
       current.changed = true;
       return render();
     }
-    if (current.textAt) {                       // dragging with the Text tool draws a wrapping text box
+    if (current.textAt) {
       current.to = [x, y];
       return render();
     }
@@ -989,7 +973,7 @@ SketchSaathi.canvas = (() => {
       current.to = [x, y];
       const [ax, ay] = current.marquee;
       const area = { x: Math.min(ax, x), y: Math.min(ay, y), x2: Math.max(ax, x), y2: Math.max(ay, y) };
-      const inside = elements.filter(el => !el.locked).filter(el => {   // fully inside, like Excalidraw
+      const inside = elements.filter(el => !el.locked).filter(el => {
         const b = bounds(el);
         return b.x >= area.x && b.y >= area.y && b.x + b.width <= area.x2 && b.y + b.height <= area.y2;
       }).map(el => el.id);
@@ -1008,14 +992,12 @@ SketchSaathi.canvas = (() => {
       return;
     }
     if (current.type === 'pen') {
-      if (e.shiftKey) {                         // straight segment from where Shift was pressed
+      if (e.shiftKey) {
         if (current.shiftFrom === undefined) current.shiftFrom = current.points.length - 1;
         current.points.length = current.shiftFrom + 1;
         current.points.push([x, y]);
       } else {
         delete current.shiftFrom;
-        // The browser merges fast mouse moves into one event; the in-between samples keep curves round.
-        // (Not for touch: some mobile browsers report those samples with the wrong offset.)
         const samples = e.pointerType !== 'touch' && e.getCoalescedEvents ? e.getCoalescedEvents() : [];
         const minGap = 0.75 / view.scale;
         (samples.length ? samples : [e]).forEach(sample => {
@@ -1069,11 +1051,20 @@ SketchSaathi.canvas = (() => {
     }
     delete el.shiftFrom;
     addElement(el);
+    if (el.type !== 'pen') selectAfterDrawing(el);
+  }
+
+  // like Excalidraw: after a shape, switch to Select with it selected (the tool lock skips this)
+  function selectAfterDrawing(el) {
+    if (toolLocked) return;
+    emit('toolchange', 'select');
+    setSelected(el.id);
+    render();
   }
   function release(e) {
     if (e.pointerType === 'touch') {
       touches.delete(e.pointerId);
-      if (current && current.pinch) {                          // wait for every finger to lift
+      if (current && current.pinch) {
         if (!touches.size) { current = null; render(); }
         return;
       }
@@ -1081,7 +1072,6 @@ SketchSaathi.canvas = (() => {
     finish();
   }
   canvas.addEventListener('pointerup', release);
-  // Right click: select what's under the pointer (unless it's already part of the selection), then show a menu.
   canvas.addEventListener('contextmenu', e => {
     e.preventDefault();
     if (editing || (current && current.pinch)) return;
@@ -1093,7 +1083,6 @@ SketchSaathi.canvas = (() => {
     render();
     emit('contextmenu', { clientX: e.clientX, clientY: e.clientY, locked: hit && hit.locked ? hit : null });
   });
-  // Double-click a text to edit it; double-click empty canvas (select tool) to add one.
   canvas.addEventListener('dblclick', e => {
     if (tool !== 'select') return;
     const [x, y] = worldPoint(e);
@@ -1103,13 +1092,11 @@ SketchSaathi.canvas = (() => {
     else if (!hit) startText(x, y);
   });
   canvas.addEventListener('pointercancel', release);
-  // Never leave a gesture hanging (button released outside the window, a dialog opened mid-drag, ...).
   canvas.addEventListener('lostpointercapture', e => {
     if (e.pointerType === 'touch') touches.delete(e.pointerId);
     finish();
   });
   canvas.addEventListener('pointerleave', () => { if (!current) canvas.style.cursor = ''; });
-  // Switching windows while Space is held never delivers the key-up: reset so the cursor isn't stuck on "pan".
   window.addEventListener('blur', () => {
     spaceDown = false;
     canvas.classList.toggle('hand', tool === 'hand');
@@ -1120,8 +1107,8 @@ SketchSaathi.canvas = (() => {
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
     const [sx, sy] = screenPoint(e);
-    if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.01), sx, sy);   // pinch / Ctrl+wheel
-    else setView({ ...view, x: view.x - e.deltaX, y: view.y - e.deltaY });     // scroll to pan
+    if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.01), sx, sy);
+    else setView({ ...view, x: view.x - e.deltaX, y: view.y - e.deltaY });
   }, { passive: false });
 
   window.addEventListener('keydown', e => {
@@ -1135,7 +1122,6 @@ SketchSaathi.canvas = (() => {
   });
   window.addEventListener('resize', () => { resize(); if (editing) styleEditor(); });
 
-  // ---------- Public API ----------
   return {
     resize,
     getElements: () => elements,
@@ -1145,7 +1131,6 @@ SketchSaathi.canvas = (() => {
     canUndo: () => history.length > 0,
     canRedo: () => future.length > 0,
     toScreen: (x, y) => [x * view.scale + view.x, y * view.scale + view.y],
-    // Is any part of the drawing on screen? (Used for "Scroll back to content".)
     isContentVisible() {
       if (!elements.length) return true;
       const x0 = -view.x / view.scale, y0 = -view.y / view.scale;
@@ -1157,7 +1142,6 @@ SketchSaathi.canvas = (() => {
     },
     on(name, fn) { listeners[name].push(fn); },
 
-    // Style for the next shape; also applied to the selected shape, if any.
     setStyle(changes) {
       Object.assign(style, changes);
       const targets = editing ? [editing.el] : selectedList();
@@ -1175,7 +1159,7 @@ SketchSaathi.canvas = (() => {
         return allowed.length > 0;
       });
       if (!changed.length) return;
-      if (editing) { styleEditor(); return; }          // saved when typing finishes
+      if (editing) { styleEditor(); return; }
       recordUpdates(before, changed);
       render();
       changed.forEach(el => emit('update', el));
@@ -1186,6 +1170,7 @@ SketchSaathi.canvas = (() => {
       if (el && el.type === 'text') startText(0, 0, el);
     },
     getEditing: () => (editing ? editing.el : null),
+    setToolLock(on) { toolLocked = on; },
     setTool(name) {
       tool = name;
       if (name !== 'select') setSelected(null);
@@ -1203,7 +1188,6 @@ SketchSaathi.canvas = (() => {
 
     zoomBy(factor) { zoomAt(factor, canvas.clientWidth / 2, canvas.clientHeight / 2, true); },
     zoomReset() { animateView({ x: 0, y: 0, scale: 1 }); },
-    // Show the whole drawing. Never zooms in past `maxScale` (100% by default), so small drawings aren't blown up.
     zoomToFit(maxScale = 1) {
       if (!elements.length) return this.zoomReset();
       const boxes = elements.map(bounds);
@@ -1222,7 +1206,6 @@ SketchSaathi.canvas = (() => {
       }, 320);
     },
 
-    // "Scroll back to content": bring the drawing into view at the current zoom (zooming out only if it doesn't fit).
     scrollToContent() {
       this.zoomToFit((viewAnimation ? viewAnimation.target : view).scale);
     },
@@ -1236,7 +1219,6 @@ SketchSaathi.canvas = (() => {
       render();
     },
 
-    // Download the drawing as a PNG on the page background, cropped to its contents.
     exportPng(filename) {
       if (!elements.length) return;
       const link = document.createElement('a');
@@ -1245,15 +1227,12 @@ SketchSaathi.canvas = (() => {
       link.click();
     },
 
-    // PNG of the selected shapes (for "Copy to clipboard as PNG").
     selectionToBlob() {
       const list = selectedList();
       if (!list.length) return Promise.resolve(null);
       return new Promise(resolve => renderToCanvas(list).toBlob(resolve, 'image/png'));
     },
 
-    // ---------- Styles, flip, lock, frames ----------
-    // Style of the first selected shape (for "Copy styles").
     getSelectionStyle() {
       const el = selected();
       if (!el) return null;
@@ -1332,9 +1311,6 @@ SketchSaathi.canvas = (() => {
       render();
     },
 
-    // ---------- Local actions (broadcast to others) ----------
-    // Undo / redo cover every change you make (draw, move, resize, style, text, layers, delete, clear...),
-    // but never other people's edits.
     undo() {
       const step = history.pop();
       if (!step) return;
@@ -1349,13 +1325,11 @@ SketchSaathi.canvas = (() => {
     },
     selectAll() { setSelected(elements.filter(el => !el.locked).map(el => el.id)); render(); },
 
-    // Point used by paste / drop, from screen coordinates.
     pointAt(clientX, clientY) {
       const r = canvas.getBoundingClientRect();
       pointer = [(clientX - r.left - view.x) / view.scale, (clientY - r.top - view.y) / view.scale];
     },
 
-    // Add an image (data URL). Placed at the pointer, or in the middle of the screen.
     insertImage(src, width, height, atPointer) {
       const scale = Math.min(1, 480 / Math.max(width, height));
       const w = width * scale, h = height * scale;
@@ -1381,10 +1355,8 @@ SketchSaathi.canvas = (() => {
     showRemoteLaser(who, color, x, y, start) { addLaserPoint(who, color, x, y, start); },
     clearSelection() { setSelected(null); render(); },
 
-    // Copies of the selected shapes, for the clipboard.
     copySelection: () => selectedList().map(clone),
 
-    // Paste shapes: at the pointer when it is on the canvas, otherwise slightly offset.
     pasteElements(list, atPointer) {
       if (!Array.isArray(list) || !list.length) return;
       const copies = list.filter(el => el && el.type).map(el => ({ ...clone(el), id: newId() }));
@@ -1451,7 +1423,6 @@ SketchSaathi.canvas = (() => {
       emit('change');
     },
 
-    // ---------- Remote actions (applied without broadcasting back) ----------
     applyRemote(event) {
       if (event.type === 'add') elements.push(event.element);
       else if (event.type === 'update') elements = elements.map(el => (el.id === event.element.id ? event.element : el));

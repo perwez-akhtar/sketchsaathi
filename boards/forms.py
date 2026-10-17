@@ -4,9 +4,6 @@ from django.contrib.auth.models import User
 
 
 class BootstrapFormMixin:
-    """Bootstrap classes on every field (`form-control`, or `form-check-input` for checkboxes),
-    a placeholder (needed by floating labels), and `is-invalid` on fields with errors."""
-
     autocomplete = {}
 
     def __init__(self, *args, **kwargs):
@@ -22,6 +19,7 @@ class BootstrapFormMixin:
                 attrs['autocomplete'] = self.autocomplete[name]
 
     def full_clean(self):
+        # mark fields with errors so Bootstrap highlights them
         super().full_clean()
         for name in self.errors:
             if name in self.fields:
@@ -46,7 +44,7 @@ class SignupForm(BootstrapFormMixin, UserCreationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['username'].help_text = 'Letters, digits and @ . + - _ only.'
-        self.fields['password1'].help_text = ''          # replaced by the live checklist on the page
+        self.fields['password1'].help_text = ''
         self.fields['password2'].label = 'Confirm password'
-        self.fields['password2'].help_text = ''          # the page shows a live "passwords match" check
+        self.fields['password2'].help_text = ''
         self.fields['password2'].widget.attrs['placeholder'] = 'Confirm password'

@@ -1,6 +1,4 @@
-// Login / sign-up page behaviour: show/hide password, strength meter, match check, loading state.
 (() => {
-  // Show / hide password
   document.querySelectorAll('.toggle-password').forEach(button => {
     button.addEventListener('click', () => {
       const input = document.getElementById(button.dataset.target);
@@ -13,7 +11,6 @@
     });
   });
 
-  // Password strength + checklist (sign-up only)
   const password = document.getElementById('id_password1');
   const confirm = document.getElementById('id_password2');
   const username = document.getElementById('id_username');
@@ -71,7 +68,6 @@
     checkStrength();
   }
 
-  // Loading state, and no double submits
   document.querySelectorAll('.js-auth-form').forEach(form => {
     form.addEventListener('submit', () => {
       const button = form.querySelector('.js-submit');
@@ -81,7 +77,6 @@
     });
   });
 
-  // Focus the first empty (or first invalid) field
   const first = document.querySelector('.js-auth-form .is-invalid, .js-auth-form input.form-control:placeholder-shown');
   if (first) first.focus();
 })();

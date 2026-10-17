@@ -1,12 +1,17 @@
-from django.contrib.auth import login
-from django.contrib.auth import views as auth_views
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import redirect
-from django.utils.decorators import method_decorator
+import hashlib
+
+from django.contrib.auth import login, logout
+from django.core.cache import cache
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import redirect, render
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.views.generic import CreateView, TemplateView
+from django.views.decorators.http import require_POST
 
 from .forms import LoginForm, SignupForm
+
+MAX_LOGIN_FAILURES = 5
+LOCKOUT_SECONDS = 15 * 60
 
 FEATURES = [
     ('bi-people', 'Live collaboration', 'Share a link and draw together. See everyone’s cursors and laser pointer as they move.'),
@@ -18,58 +23,69 @@ FEATURES = [
 ]
 
 
-@method_decorator(ensure_csrf_cookie, name='dispatch')
-class HomeView(TemplateView):
-    """The drawing app for signed-in users; the landing page for everyone else."""
-
-    def get_template_names(self):
-        return ['boards/index.html' if self.request.user.is_authenticated else 'boards/landing.html']
-
-    def get_context_data(self, **kwargs):
-        return super().get_context_data(features=FEATURES, guest=False, **kwargs)
+@ensure_csrf_cookie
+def home(request):
+    if request.user.is_authenticated:
+        return render(request, 'boards/index.html', {'guest': False})
+    return render(request, 'boards/landing.html', {'features': FEATURES})
 
 
-class BoardLinkView(LoginRequiredMixin, HomeView):
-    """A shared board link (/b/<uuid>/). The app reads the id and loads the board itself."""
+@login_required
+@ensure_csrf_cookie
+def board_link(request, board_uuid):
+    return render(request, 'boards/index.html', {'guest': False})
 
 
-class GuestView(TemplateView):
-    """The full editor without an account (like Excalidraw). Drawings stay in this browser
-    until the visitor signs up or logs in, when they are moved into their account."""
-
-    template_name = 'boards/index.html'
-
-    def dispatch(self, request, *args, **kwargs):
-        if request.user.is_authenticated:
-            return redirect('home')
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_context_data(self, **kwargs):
-        return super().get_context_data(guest=True, **kwargs)
-
-
-class LoginView(auth_views.LoginView):
-    template_name = 'boards/auth/login.html'
-    authentication_form = LoginForm
-    redirect_authenticated_user = True
-
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        if not form.cleaned_data.get('remember'):
-            self.request.session.set_expiry(0)           # signed out when the browser closes
-        return response
-
-
-class SignupView(CreateView):
-    form_class = SignupForm
-    template_name = 'boards/auth/signup.html'
-
-    def dispatch(self, request, *args, **kwargs):
-        if request.user.is_authenticated:
-            return redirect('home')
-        return super().dispatch(request, *args, **kwargs)
-
-    def form_valid(self, form):
-        user = form.save()
-        login(self.request, user)
+def draw(request):
+    if request.user.is_authenticated:
         return redirect('home')
+    return render(request, 'boards/index.html', {'guest': True})
+
+
+def login_user(request):
+    if request.user.is_authenticated:
+        return redirect('home')
+
+    form = LoginForm(request, data=request.POST or None)
+    next_url = request.POST.get('next') or request.GET.get('next', '')
+
+    if request.method == 'POST':
+        who = request.META.get('REMOTE_ADDR', '') + request.POST.get('username', '').lower()
+        key = 'login-fail:' + hashlib.sha256(who.encode()).hexdigest()
+        if cache.get(key, 0) >= MAX_LOGIN_FAILURES:
+            form.add_error(None, 'Too many failed attempts. Try again in 15 minutes.')
+            return render(request, 'boards/auth/login.html', {'form': form, 'next': next_url}, status=429)
+
+    if request.method == 'POST' and form.is_valid():
+        cache.delete(key)
+        login(request, form.get_user())
+        if not form.cleaned_data.get('remember'):
+            # session ends when the browser closes
+            request.session.set_expiry(0)
+        # only follow ?next= to our own site
+        safe = url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()},
+                                               require_https=request.is_secure())
+        return redirect(next_url if safe else 'home')
+
+    if request.method == 'POST':
+        cache.set(key, cache.get(key, 0) + 1, LOCKOUT_SECONDS)
+    return render(request, 'boards/auth/login.html', {'form': form, 'next': next_url})
+
+
+@require_POST
+def logout_user(request):
+    logout(request)
+    return redirect('home')
+
+
+def signup(request):
+    if request.user.is_authenticated:
+        return redirect('home')
+
+    form = SignupForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        user = form.save()
+        login(request, user)
+        return redirect('home')
+
+    return render(request, 'boards/auth/signup.html', {'form': form})

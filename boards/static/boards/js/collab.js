@@ -1,4 +1,3 @@
-// Real-time sync over WebSocket: sends local edits and applies edits from others.
 window.SketchSaathi = window.SketchSaathi || {};
 
 SketchSaathi.collab = (() => {

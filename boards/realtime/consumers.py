@@ -1,4 +1,5 @@
 import re
+import time
 import uuid
 
 from channels.db import database_sync_to_async
@@ -6,11 +7,11 @@ from channels.generic.websocket import AsyncJsonWebsocketConsumer
 
 from boards.models import Board
 
-# Events a client may send. `join`/`leave` are produced by the server itself.
-# Drawing events carry the uuid of the page they apply to; `pages` means the tab list changed.
 DRAWING_EVENTS = {'add', 'update', 'remove', 'clear', 'order'}
 PRESENCE_EVENTS = {'cursor', 'hello'}
 HEX_COLOR = re.compile(r'#[0-9a-fA-F]{6}')
+MAX_MESSAGE_CHARS = 1_000_000
+MAX_MESSAGES_PER_SECOND = 120
 
 
 def is_number(value):
@@ -18,9 +19,6 @@ def is_number(value):
 
 
 class BoardConsumer(AsyncJsonWebsocketConsumer):
-    """Relays drawing events and presence (who is here, where their cursor is)
-    between everyone who has the same board open."""
-
     async def connect(self):
         user = self.scope.get('user')
         if user is None or not user.is_authenticated:
@@ -31,7 +29,9 @@ class BoardConsumer(AsyncJsonWebsocketConsumer):
         if not await self.board_exists():
             await self.close(code=4404)
             return
-        self.cid = uuid.uuid4().hex[:8]       # identifies this connection (one user can have several tabs)
+        self.cid = uuid.uuid4().hex[:8]
+        self.window_start = time.monotonic()
+        self.window_count = 0
         self.group = f'board_{self.board_uuid}'
         await self.channel_layer.group_add(self.group, self.channel_name)
         await self.accept()
@@ -41,6 +41,18 @@ class BoardConsumer(AsyncJsonWebsocketConsumer):
         if hasattr(self, 'group'):
             await self.broadcast({'type': 'leave'})
             await self.channel_layer.group_discard(self.group, self.channel_name)
+
+    async def receive(self, text_data=None, bytes_data=None, **kwargs):
+        if not text_data or len(text_data) > MAX_MESSAGE_CHARS:
+            await self.close(code=1009)
+            return
+        now = time.monotonic()
+        if now - self.window_start >= 1:
+            self.window_start, self.window_count = now, 0
+        self.window_count += 1
+        if self.window_count > MAX_MESSAGES_PER_SECOND:
+            return
+        await super().receive(text_data=text_data, **kwargs)
 
     async def receive_json(self, content, **kwargs):
         if not isinstance(content, dict):
@@ -61,7 +73,7 @@ class BoardConsumer(AsyncJsonWebsocketConsumer):
             await self.broadcast({'type': 'cursor', 'x': content['x'], 'y': content['y'], 'page': content.get('page')})
 
     async def broadcast(self, event):
-        # Identity is always set by the server, never trusted from the client.
+        # identity always comes from the server, never from the client
         event = {**event, 'user': self.user.get_username(), 'cid': self.cid}
         await self.channel_layer.group_send(
             self.group, {'type': 'board.event', 'sender': self.channel_name, 'event': event},
