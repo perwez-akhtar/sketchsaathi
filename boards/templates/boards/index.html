@@ -1,0 +1,19 @@
+{% extends 'boards/layouts/base.html' %}
+{% load static %}
+
+{% block body_attrs %}{% if guest %} data-guest="1"{% endif %}{% endblock %}
+
+{% block content %}
+  <canvas id="canvas"></canvas>
+  {% include 'boards/includes/toolbar.html' %}
+{% endblock %}
+
+{% block scripts %}
+  <script src="{% static 'boards/js/ui.js' %}"></script>
+  <script src="{% static 'boards/js/api.js' %}"></script>
+  <script src="{% static 'boards/js/local-store.js' %}"></script>
+  <script src="{% static 'boards/js/canvas.js' %}"></script>
+  <script src="{% static 'boards/js/collab.js' %}"></script>
+  <script src="{% static 'boards/js/presence.js' %}"></script>
+  <script src="{% static 'boards/js/app.js' %}"></script>
+{% endblock %}

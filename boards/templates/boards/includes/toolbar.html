@@ -1,0 +1,325 @@
+<!-- Main menu (top-left) -->
+<div class="menu-wrap">
+  <button id="menuButton" class="icon-btn float" aria-label="Menu" aria-expanded="false" title="Menu">
+    <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+  <div id="menu" class="panel menu" hidden>
+    <label class="field">Board title
+      <input id="title" placeholder="Untitled" value="Untitled" autocomplete="off">
+    </label>
+    <label class="field">Open board
+      <select id="boards"><option value="">New board</option></select>
+    </label>
+    <button id="save" class="item">Save<kbd>Ctrl+S</kbd></button>
+    <button id="export" class="item">Export page as PNG</button>
+    <button id="fit" class="item">Zoom to fit<kbd>Shift+1</kbd></button>
+    <button id="grid" class="item">Show grid<kbd id="gridState">Off</kbd></button>
+    <button id="clear" class="item">Clear page</button>
+    <button id="delete" class="item danger" hidden>Delete board</button>
+    <hr>
+    {% if guest %}
+      <div class="who">Sketching without an account – saved in this browser.</div>
+      <a class="item item-cta" href="{% url 'signup' %}">Sign up to save &amp; share</a>
+      <a class="item" href="{% url 'login' %}">Log in</a>
+    {% else %}
+      <div class="who">Signed in as <strong>{{ request.user.username }}</strong></div>
+      <form method="post" action="{% url 'logout' %}">{% csrf_token %}
+        <button type="submit" class="item">Log out</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Tools (left rail) -->
+<nav class="toolbar floating" aria-label="Drawing tools">
+  <button class="tool" data-tool="hand" title="Hand – move canvas (H)">
+    <svg viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 013 0V12m0-1.5v-6a1.5 1.5 0 013 0V12m0-5.5a1.5 1.5 0 013 0V13m0-3.5a1.5 1.5 0 013 0V15a6 6 0 01-6 6h-1.5a6 6 0 01-5-2.7L5 14.5a1.5 1.5 0 012.5-1.6L8 14"/></svg><sub>H</sub>
+  </button>
+  <button class="tool" data-tool="select" title="Select, move and resize (V)">
+    <svg viewBox="0 0 24 24"><path d="M6 4l12 7-5.5 1.5L10 18z"/></svg><sub>V</sub>
+  </button>
+  <span class="divider"></span>
+  <button class="tool" data-tool="rectangle" title="Rectangle (R)">
+    <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg><sub>R</sub>
+  </button>
+  <button class="tool" data-tool="diamond" title="Diamond (D)">
+    <svg viewBox="0 0 24 24"><path d="M12 4l8 8-8 8-8-8z"/></svg><sub>D</sub>
+  </button>
+  <button class="tool" data-tool="ellipse" title="Ellipse (O)">
+    <svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="8" ry="6.5"/></svg><sub>O</sub>
+  </button>
+  <button class="tool" data-tool="arrow" title="Arrow (A)">
+    <svg viewBox="0 0 24 24"><path d="M5 19L19 5M10 5h9v9"/></svg><sub>A</sub>
+  </button>
+  <button class="tool" data-tool="line" title="Line (L)">
+    <svg viewBox="0 0 24 24"><path d="M5 19L19 5"/></svg><sub>L</sub>
+  </button>
+  <button class="tool active" data-tool="pen" title="Draw (P)">
+    <svg viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16l-1 4zM14 6l3 3"/></svg><sub>P</sub>
+  </button>
+  <button class="tool" data-tool="text" title="Text (T)">
+    <svg viewBox="0 0 24 24"><path d="M5 6V5h14v1M12 5v14M9 19h6"/></svg><sub>T</sub>
+  </button>
+  <button class="tool" data-tool="laser" title="Laser pointer (K)">
+    <svg viewBox="0 0 24 24"><path d="M4 20l8-8M14 4l1 3 3 1-3 1-1 3-1-3-3-1 3-1z"/></svg><sub>K</sub>
+  </button>
+  <button class="tool" data-tool="eraser" title="Eraser (E)">
+    <svg viewBox="0 0 24 24"><path d="M8 19h11M5 14l8-8 6 6-6 6H9z"/></svg><sub>E</sub>
+  </button>
+  <button class="tool" id="moreButton" title="More tools" aria-haspopup="menu" aria-expanded="false">
+    <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>
+  </button>
+  <span class="divider"></span>
+  <button class="tool danger" id="clearTool" title="Clear page">
+    <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>
+  </button>
+</nav>
+
+<!-- More tools (opens next to the ⋯ button) -->
+<div id="moreMenu" class="panel more-menu" role="menu" hidden>
+  <button class="more-item" role="menuitem" id="insertImage">
+    <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg>
+    <span>Insert image</span><kbd>9</kbd>
+  </button>
+  <button class="more-item" role="menuitem" data-tool="frame">
+    <svg viewBox="0 0 24 24"><path d="M7 3v18M17 3v18M3 7h18M3 17h18"/></svg>
+    <span>Frame</span><kbd>F</kbd>
+  </button>
+  <button class="more-item" role="menuitem" data-tool="bucket">
+    <svg viewBox="0 0 24 24"><path d="M5 11l7-7 7 7-7 7z"/><path d="M19 15s2 2.4 2 3.5a2 2 0 01-4 0c0-1.1 2-3.5 2-3.5z"/></svg>
+    <span>Bucket fill</span><kbd>B</kbd>
+  </button>
+  <button class="more-item" role="menuitem" data-tool="lasso">
+    <svg viewBox="0 0 24 24"><path d="M7 17c-2.5-1-4-3-4-5.5C3 7.4 7 4 12 4s9 3.4 9 7.5S17 19 12 19c-1.6 0-3-.3-4.3-.8M7 17l-1 4"/></svg>
+    <span>Lasso selection</span><kbd>Shift L</kbd>
+  </button>
+</div>
+<input type="file" id="imageFile" accept="image/*" hidden>
+
+<!-- Properties (right). Applies to the selected shape, or to the next one you draw. -->
+<aside class="panel style" aria-label="Properties">
+  <div class="label">Stroke</div>
+  <div class="colors" id="colors">
+    <button class="dot active" data-color="#1e1e1e" style="--c:#1e1e1e" title="Black"></button>
+    <button class="dot" data-color="#e03131" style="--c:#e03131" title="Red"></button>
+    <button class="dot" data-color="#2f9e44" style="--c:#2f9e44" title="Green"></button>
+    <button class="dot" data-color="#1971c2" style="--c:#1971c2" title="Blue"></button>
+    <button class="dot" data-color="#f08c00" style="--c:#f08c00" title="Orange"></button>
+    <label class="dot custom" title="Custom colour"><input type="color" id="color" value="#6741d9"></label>
+  </div>
+  <label class="hex"><span>#</span><input id="hex" value="1e1e1e" maxlength="6" spellcheck="false" aria-label="Stroke hex colour"></label>
+
+  <!-- Text options: shown for a selected text or while the Text tool is active -->
+  <div id="textProps" class="section" hidden>
+    <div class="label">Font family</div>
+    <div class="options" id="fontFamilies">
+      <button class="opt active" data-font="hand" title="Hand-drawn"><svg viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16l-1 4z"/></svg></button>
+      <button class="opt font-sans" data-font="sans" title="Normal">A</button>
+      <button class="opt" data-font="mono" title="Code"><svg viewBox="0 0 24 24"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/></svg></button>
+    </div>
+    <div class="label">Font size</div>
+    <div class="options" id="fontSizes">
+      <button class="opt" data-font-size="16" title="Small">S</button>
+      <button class="opt active" data-font-size="20" title="Medium">M</button>
+      <button class="opt" data-font-size="28" title="Large">L</button>
+      <button class="opt" data-font-size="36" title="Extra large">XL</button>
+    </div>
+    <div class="label">Text align</div>
+    <div class="options" id="aligns">
+      <button class="opt active" data-align="left" title="Left"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h13"/></svg></button>
+      <button class="opt" data-align="center" title="Centre"><svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M5.5 18h13"/></svg></button>
+      <button class="opt" data-align="right" title="Right"><svg viewBox="0 0 24 24"><path d="M4 6h16M10 12h10M7 18h13"/></svg></button>
+    </div>
+  </div>
+
+  <!-- Shape options -->
+  <div id="shapeProps" class="section">
+  <div class="label">Fill</div>
+  <div class="colors" id="fills">
+    <button class="dot none active" data-fill="" title="No fill"></button>
+    <button class="dot" data-fill="#ffc9c9" style="--c:#ffc9c9" title="Light red"></button>
+    <button class="dot" data-fill="#b2f2bb" style="--c:#b2f2bb" title="Light green"></button>
+    <button class="dot" data-fill="#a5d8ff" style="--c:#a5d8ff" title="Light blue"></button>
+    <button class="dot" data-fill="#ffec99" style="--c:#ffec99" title="Light yellow"></button>
+  </div>
+
+  <div class="label">Stroke width</div>
+  <div class="options" id="widths">
+    <button class="opt" data-size="2" title="Thin"><i class="bar" style="height:2px"></i></button>
+    <button class="opt active" data-size="4" title="Medium"><i class="bar" style="height:4px"></i></button>
+    <button class="opt" data-size="8" title="Bold"><i class="bar" style="height:7px"></i></button>
+  </div>
+
+  <div class="label">Stroke style</div>
+  <div class="options" id="strokeStyles">
+    <button class="opt active" data-stroke="solid" title="Solid"><svg viewBox="0 0 24 12"><path d="M2 6h20"/></svg></button>
+    <button class="opt" data-stroke="dashed" title="Dashed"><svg viewBox="0 0 24 12"><path d="M2 6h20" stroke-dasharray="5 3"/></svg></button>
+    <button class="opt" data-stroke="dotted" title="Dotted"><svg viewBox="0 0 24 12"><path d="M2 6h20" stroke-dasharray="0.5 3.5"/></svg></button>
+  </div>
+
+  <div class="label">Edges</div>
+  <div class="options" id="edges">
+    <button class="opt active" data-round="0" title="Sharp"><svg viewBox="0 0 24 24"><path d="M5 19V5h14"/></svg></button>
+    <button class="opt" data-round="1" title="Round"><svg viewBox="0 0 24 24"><path d="M5 19V11a6 6 0 016-6h8"/></svg></button>
+  </div>
+  </div>
+
+  <div class="label">Opacity <output id="opacityValue">100</output></div>
+  <input type="range" id="opacity" class="range" min="10" max="100" step="5" value="100">
+
+  <div id="selectionTools" hidden>
+    <div class="label">Layers</div>
+    <div class="options">
+      <button class="opt" data-layer="back" title="Send to back"><svg viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5M5 20h14"/></svg></button>
+      <button class="opt" data-layer="backward" title="Send backward"><svg viewBox="0 0 24 24"><path d="M12 5v14M7 14l5 5 5-5"/></svg></button>
+      <button class="opt" data-layer="forward" title="Bring forward"><svg viewBox="0 0 24 24"><path d="M12 19V5M7 10l5-5 5 5"/></svg></button>
+      <button class="opt" data-layer="front" title="Bring to front"><svg viewBox="0 0 24 24"><path d="M12 20V8M7 13l5-5 5 5M5 4h14"/></svg></button>
+    </div>
+    <div class="label">Actions</div>
+    <div class="options">
+      <button class="opt" id="duplicate" title="Duplicate (Ctrl+D)"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3"/></svg></button>
+      <button class="opt danger" id="deleteSelection" title="Delete (Del)"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+    </div>
+  </div>
+
+  <div class="label">Page background</div>
+  <div class="colors" id="backgrounds">
+    <button class="dot active" data-bg="#ffffff" style="--c:#ffffff" title="White"></button>
+    <button class="dot" data-bg="#fdf6e3" style="--c:#fdf6e3" title="Paper"></button>
+    <button class="dot" data-bg="#e6fcf5" style="--c:#e6fcf5" title="Mint"></button>
+    <button class="dot" data-bg="#e7f5ff" style="--c:#e7f5ff" title="Sky"></button>
+    <button class="dot" data-bg="#1e293b" style="--c:#1e293b" title="Slate"></button>
+    <label class="dot custom" title="Custom background"><input type="color" id="bgColor" value="#fff4e6"></label>
+  </div>
+</aside>
+
+<!-- Share, people, theme (top-right) -->
+<div class="top-right">
+  <div id="people" class="people" aria-label="People on this board"></div>
+  <span id="status" role="status"></span>
+  <button id="styleToggle" class="icon-btn float" aria-label="Style" aria-expanded="false" title="Style">
+    <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 100 18c1.1 0 1.6-.8 1.6-1.6 0-.5-.2-.8-.5-1.1-.3-.3-.5-.7-.5-1.1 0-.9.7-1.6 1.6-1.6H16a5 5 0 005-5c0-4.1-4-7.6-9-7.6z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14.5" cy="7.5" r="1"/></svg>
+  </button>
+  <button id="theme" class="icon-btn float" aria-label="Toggle dark mode" title="Light / dark mode">
+    <svg class="moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"/></svg>
+    <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+  </button>
+  <button id="share" class="share">Share</button>
+</div>
+
+<!-- Page tabs (bottom-left) -->
+<div class="pages floating" aria-label="Pages">
+  <div id="tabs" class="tabs" role="tablist"></div>
+  <button id="addPage" class="add-page" title="New page (Ctrl+Alt+N)" aria-label="New page">+</button>
+</div>
+
+<button id="scrollBack" class="scroll-back" hidden>Scroll back to content</button>
+
+<!-- Zoom and history (bottom-right) -->
+<div class="bottom-controls">
+  <div class="pill zoom-pill">
+    <button id="zoomOut" aria-label="Zoom out" title="Zoom out">−</button>
+    <button id="zoomReset" class="zoom" title="Reset zoom">100%</button>
+    <button id="zoomIn" aria-label="Zoom in" title="Zoom in">+</button>
+    <span class="pill-divider"></span>
+    <button id="zoomResetIcon" aria-label="Reset zoom to 100%" title="Reset zoom to 100% (Ctrl+0)" disabled>
+      <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 108-8 8.2 8.2 0 00-5.7 2.3L4 8.5"/><path d="M4 4v4.5h4.5"/></svg>
+    </button>
+  </div>
+  <div class="pill">
+    <button id="undo" aria-label="Undo" title="Undo (Ctrl+Z)">
+      <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3"/></svg>
+    </button>
+    <button id="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">
+      <svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5M20 9H10a6 6 0 000 12h3"/></svg>
+    </button>
+  </div>
+  <div class="pill">
+    <button id="helpButton" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
+  </div>
+</div>
+
+<!-- Keyboard shortcuts -->
+<dialog id="help" class="panel help">
+  <header>
+    <h2>Keyboard shortcuts</h2>
+    <button class="close" data-close aria-label="Close">×</button>
+  </header>
+  <div class="help-grid">
+    <section>
+      <h3>Tools</h3>
+      <dl>
+        <dt>Hand (move canvas)</dt><dd><kbd>H</kbd></dd>
+        <dt>Select</dt><dd><kbd>V</kbd> <kbd>1</kbd></dd>
+        <dt>Rectangle</dt><dd><kbd>R</kbd> <kbd>2</kbd></dd>
+        <dt>Diamond</dt><dd><kbd>D</kbd> <kbd>3</kbd></dd>
+        <dt>Ellipse</dt><dd><kbd>O</kbd> <kbd>4</kbd></dd>
+        <dt>Arrow</dt><dd><kbd>A</kbd> <kbd>5</kbd></dd>
+        <dt>Line</dt><dd><kbd>L</kbd> <kbd>6</kbd></dd>
+        <dt>Draw</dt><dd><kbd>P</kbd> <kbd>7</kbd></dd>
+        <dt>Text</dt><dd><kbd>T</kbd> <kbd>8</kbd></dd>
+        <dt>Eraser</dt><dd><kbd>E</kbd> <kbd>0</kbd></dd>
+        <dt>Insert image</dt><dd><kbd>9</kbd> or paste / drop</dd>
+        <dt>Frame</dt><dd><kbd>F</kbd></dd>
+        <dt>Laser pointer</dt><dd><kbd>K</kbd></dd>
+        <dt>Bucket fill</dt><dd><kbd>B</kbd></dd>
+        <dt>Lasso selection</dt><dd><kbd>Shift L</kbd></dd>
+        <dt>Straight / square / circle</dt><dd>hold <kbd>Shift</kbd></dd>
+        <dt>Move canvas</dt><dd>hold <kbd>Space</kbd> and drag</dd>
+      </dl>
+    </section>
+    <section>
+      <h3>Editing</h3>
+      <dl>
+        <dt>Undo / Redo</dt><dd><kbd>Ctrl Z</kbd> / <kbd>Ctrl Shift Z</kbd></dd>
+        <dt>Select all</dt><dd><kbd>Ctrl A</kbd></dd>
+        <dt>Add to selection</dt><dd><kbd>Shift</kbd> / <kbd>Ctrl</kbd> click</dd>
+        <dt>Copy / Cut / Paste</dt><dd><kbd>Ctrl C</kbd> <kbd>Ctrl X</kbd> <kbd>Ctrl V</kbd></dd>
+        <dt>Duplicate</dt><dd><kbd>Ctrl D</kbd></dd>
+        <dt>Copy / paste styles</dt><dd><kbd>Ctrl Alt C</kbd> / <kbd>Ctrl Alt V</kbd></dd>
+        <dt>Copy as PNG</dt><dd><kbd>Shift Alt C</kbd></dd>
+        <dt>Flip horizontal / vertical</dt><dd><kbd>Shift H</kbd> / <kbd>Shift V</kbd></dd>
+        <dt>Lock</dt><dd><kbd>Ctrl Shift L</kbd> (right-click to unlock)</dd>
+        <dt>More actions</dt><dd>right-click</dd>
+        <dt>Delete</dt><dd><kbd>Del</kbd></dd>
+        <dt>Move selection</dt><dd><kbd>←↑→↓</kbd> (<kbd>Shift</kbd> = 10px)</dd>
+        <dt>Edit text</dt><dd><kbd>Enter</kbd> or double-click</dd>
+        <dt>Finish text</dt><dd><kbd>Esc</kbd></dd>
+        <dt>Deselect</dt><dd><kbd>Esc</kbd></dd>
+        <dt>Bring forward / to front</dt><dd><kbd>Ctrl ]</kbd> / <kbd>Ctrl Shift ]</kbd></dd>
+        <dt>Send backward / to back</dt><dd><kbd>Ctrl [</kbd> / <kbd>Ctrl Shift [</kbd></dd>
+      </dl>
+    </section>
+    <section>
+      <h3>View &amp; board</h3>
+      <dl>
+        <dt>Zoom in / out</dt><dd><kbd>Ctrl +</kbd> / <kbd>Ctrl −</kbd></dd>
+        <dt>Reset zoom</dt><dd><kbd>Ctrl 0</kbd></dd>
+        <dt>Zoom to fit</dt><dd><kbd>Shift 1</kbd></dd>
+        <dt>Toggle grid</dt><dd><kbd>Ctrl '</kbd></dd>
+        <dt>Dark mode</dt><dd><kbd>Alt Shift D</kbd></dd>
+        <dt>Save</dt><dd><kbd>Ctrl S</kbd></dd>
+        <dt>Export PNG</dt><dd><kbd>Ctrl Shift E</kbd></dd>
+        <dt>New page</dt><dd><kbd>Ctrl Alt N</kbd></dd>
+        <dt>Previous / next page</dt><dd><kbd>Ctrl PgUp</kbd> / <kbd>Ctrl PgDn</kbd></dd>
+        <dt>This help</dt><dd><kbd>?</kbd></dd>
+      </dl>
+    </section>
+  </div>
+</dialog>
+
+<!-- Welcome hint (shown while the page is empty) -->
+<div id="welcome" class="welcome">
+  <div class="hint hint-tools">Pick a tool &amp;<br>start drawing!</div>
+  <h2 class="logo">Co<span>Sketch</span></h2>
+  {% if guest %}
+    <p>Your sketch is saved in this browser.<br>Sign up any time to keep it and share it.</p>
+  {% else %}
+    <p>Your boards are saved to your account.<br>Share the link to draw together in real time.</p>
+  {% endif %}
+</div>
+
+<div id="cursors" class="cursors" aria-hidden="true"></div>
+
+<!-- Right-click menu (filled in by app.js) -->
+<div id="contextMenu" class="panel context-menu" role="menu" hidden></div>

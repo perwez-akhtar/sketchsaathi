@@ -1,0 +1,4 @@
+-r requirements.txt
+ipython==9.17.1
+django-extensions==4.1
+playwright==1.64.0

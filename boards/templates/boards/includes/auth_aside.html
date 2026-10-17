@@ -1,0 +1,21 @@
+{# Branded side panel shown next to the login / sign-up form on large screens. #}
+<aside class="col-lg-6 d-none d-lg-flex auth-aside">
+  <div class="auth-aside-inner">
+    <a class="brand brand-light" href="{% url 'home' %}">Co<span>Sketch</span></a>
+    <h2 class="display-6 fw-bold mt-5 mb-3">{{ heading }}</h2>
+    <p class="lead opacity-75 mb-4">{{ subheading }}</p>
+    <ul class="list-unstyled auth-points">
+      <li><i class="bi bi-people-fill"></i> Draw together and see each other’s cursors live</li>
+      <li><i class="bi bi-journals"></i> Boards with pages, like a notebook</li>
+      <li><i class="bi bi-cloud-check-fill"></i> Everything saves automatically</li>
+    </ul>
+    <svg class="auth-doodle" viewBox="0 0 320 160" aria-hidden="true">
+      <rect x="14" y="20" width="110" height="60" rx="12" fill="rgba(255,255,255,.18)" stroke="#fff" stroke-width="2"/>
+      <path d="M210 14l46 36-46 36-46-36z" fill="rgba(255,255,255,.12)" stroke="#fff" stroke-width="2"/>
+      <path d="M124 50h36" stroke="#fff" stroke-width="2" fill="none" marker-end="url(#authHead)"/>
+      <path d="M30 130c20-24 36 16 58-4s30 16 52-2 30 14 46 0" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".85"/>
+      <g transform="translate(250 104)"><path d="M0 0l13 8-6 2-2 6z" fill="#fde047" stroke="#0f766e"/></g>
+      <defs><marker id="authHead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10" fill="none" stroke="#fff" stroke-width="1.6"/></marker></defs>
+    </svg>
+  </div>
+</aside>

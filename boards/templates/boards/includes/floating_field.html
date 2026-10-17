@@ -1,0 +1,18 @@
+{# One form field with a floating label and an icon. Pass `password=True` for a show/hide button. #}
+<div class="mb-3">
+  <div class="input-group has-validation auth-field">
+    <span class="input-group-text"><i class="bi {{ icon }}"></i></span>
+    <div class="form-floating{% if field.errors %} is-invalid{% endif %}">
+      {{ field }}
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+    </div>
+    {% if password %}
+      <button class="btn toggle-password" type="button" data-target="{{ field.id_for_label }}"
+              aria-label="Show password" title="Show password">
+        <i class="bi bi-eye"></i>
+      </button>
+    {% endif %}
+    {% for error in field.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+  </div>
+  {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+</div>

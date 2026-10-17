@@ -1,0 +1,53 @@
+{% extends 'boards/layouts/site.html' %}
+
+{% block title %}Log in · SketchSaathi{% endblock %}
+{% block body_class %}auth-body{% endblock %}
+
+{% block content %}
+<main class="auth-page container-fluid">
+  <div class="row g-0 auth-shell">
+    {% include 'boards/includes/auth_aside.html' with heading='Welcome back.' subheading='Pick up right where you left off – your boards are waiting.' %}
+
+    <section class="col-lg-6 auth-main">
+      <div class="auth-form">
+        <a class="brand d-lg-none d-inline-block mb-4 text-decoration-none" href="{% url 'home' %}">Co<span>Sketch</span></a>
+        <h1 class="h3 fw-bold mb-1">Log in</h1>
+        <p class="text-body-secondary mb-4">Good to see you again.</p>
+
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger d-flex align-items-center gap-2 py-2" role="alert">
+            <i class="bi bi-exclamation-circle-fill"></i>
+            <span>{% for error in form.non_field_errors %}{{ error }}{% endfor %}</span>
+          </div>
+        {% endif %}
+
+        <form method="post" novalidate class="js-auth-form">
+          {% csrf_token %}
+          {% include 'boards/includes/floating_field.html' with field=form.username icon='bi-person' %}
+          {% include 'boards/includes/floating_field.html' with field=form.password icon='bi-lock' password=True %}
+          <div class="form-check mb-4">
+            {{ form.remember }}
+            <label class="form-check-label" for="{{ form.remember.id_for_label }}">{{ form.remember.label }}</label>
+          </div>
+          <input type="hidden" name="next" value="{{ next }}">
+          <button type="submit" class="btn btn-brand btn-lg w-100 js-submit">
+            <span class="spinner-border spinner-border-sm me-2 d-none" aria-hidden="true"></span>
+            <span class="label">Log in</span>
+          </button>
+        </form>
+
+        <div class="auth-divider"><span>or</span></div>
+        <a class="btn btn-outline-secondary w-100" href="{% url 'guest' %}">
+          <i class="bi bi-pencil me-1"></i> Continue without an account
+        </a>
+
+        <p class="text-center text-body-secondary small mt-4 mb-0">
+          New to SketchSaathi? <a class="fw-semibold" href="{% url 'signup' %}">Create a free account</a>
+        </p>
+      </div>
+    </section>
+  </div>
+</main>
+{% endblock %}
+
+{% block footer %}{% endblock %}
