@@ -261,6 +261,19 @@ canvas.text { cursor: text; }
 .hint-menu { display: none; }
 
 #styleToggle { display: none; }
+.style { transition: transform .22s ease, visibility 0s; }
+.style.collapsed { transform: translateX(calc(100% + 20px)); visibility: hidden; transition: transform .22s ease, visibility 0s .22s; }
+.style-handle {
+  position: fixed; top: 96px; right: 226px; z-index: 4; width: 26px; height: 68px; padding: 0;
+  display: grid; place-items: center; color: var(--accent); cursor: pointer;
+  background: var(--panel); border: 1.5px solid var(--accent); border-right: 0;
+  border-radius: 12px 0 0 12px; box-shadow: -3px 2px 12px rgba(20, 24, 40, .16);
+  transition: right .22s ease, background .15s, color .15s;
+}
+.style-handle:hover { background: var(--accent); color: #fff; }
+.style-handle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; transition: transform .22s; }
+.style-handle[aria-expanded='false'] { right: 0; }
+.style-handle[aria-expanded='false'] svg { transform: rotate(180deg); }
 @keyframes sheet-up { from { opacity: 0; transform: translateY(12px); } }
 @media (max-width: 900px) {
   .hint { display: none; }
@@ -278,6 +291,7 @@ canvas.text { cursor: text; }
     box-shadow: 0 -2px 18px rgba(20, 24, 40, .14);
   }
   .style.open { display: flex; animation: sheet-up .16s ease-out; }
+  .style-handle { display: none; }
   #styleToggle { display: grid; }
   #styleToggle[aria-expanded='true'] { color: var(--accent); border-color: var(--accent); }
   .tool { width: 40px; height: 40px; }

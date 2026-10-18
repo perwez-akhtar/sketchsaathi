@@ -603,11 +603,24 @@
   canvas.on('editing', refreshPanel);
 
   const stylePanel = document.querySelector('.style');
+  const phone = matchMedia('(max-width: 640px)');
+  const styleIsOpen = () => (phone.matches ? stylePanel.classList.contains('open') : !stylePanel.classList.contains('collapsed'));
+  // on a phone the panel is a sheet; on a computer it can be hidden and brought back
   function toggleStyleSheet(open) {
-    stylePanel.classList.toggle('open', open);
-    $('styleToggle').setAttribute('aria-expanded', String(open));
+    if (phone.matches) stylePanel.classList.toggle('open', open);
+    else {
+      stylePanel.classList.toggle('collapsed', !open);
+    }
+    syncStyleButtons();
   }
-  $('styleToggle').onclick = () => toggleStyleSheet(!stylePanel.classList.contains('open'));
+  function syncStyleButtons() {
+    const open = String(styleIsOpen());
+    $('styleToggle').setAttribute('aria-expanded', open);
+    $('styleHandle').setAttribute('aria-expanded', open);
+    $('styleHandle').setAttribute('aria-label', open === 'true' ? 'Hide style panel' : 'Show style panel');
+  }
+  $('styleToggle').onclick = () => toggleStyleSheet(!styleIsOpen());
+  $('styleHandle').onclick = () => toggleStyleSheet(!styleIsOpen());
 
   function showBackground(color) {
     canvas.setBackground(color);
@@ -625,6 +638,7 @@
 
   const remember = (key, value) => { try { localStorage.setItem(key, value); } catch {} };
   const recall = key => { try { return localStorage.getItem(key); } catch { return null; } };
+  syncStyleButtons();
 
   function setTheme(dark) {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
@@ -642,7 +656,7 @@
 
   const savedTheme = recall('sketchsaathi.theme');
   setTheme(savedTheme ? savedTheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches);
-  setGrid(recall('sketchsaathi.grid') === '1');
+  setGrid(recall('sketchsaathi.grid') !== '0');
 
   $('zoomIn').onclick = () => canvas.zoomBy(1.2);
   $('zoomOut').onclick = () => canvas.zoomBy(1 / 1.2);
@@ -707,7 +721,7 @@
 
   document.addEventListener('keydown', e => {
     if (help.open) return;
-    if (e.key === 'Escape') { toggleMenu(false); toggleMore(false); toggleStyleSheet(false); closeContextMenu(); canvas.clearSelection(); return; }
+    if (e.key === 'Escape') { toggleMenu(false); toggleMore(false); if (phone.matches) toggleStyleSheet(false); closeContextMenu(); canvas.clearSelection(); return; }
     if (e.ctrlKey && !e.altKey && !e.shiftKey && (e.code === 'KeyS' || e.code === 'KeyO')) {
       e.preventDefault();
       return e.code === 'KeyS' ? saveToFile() : openFromFile();

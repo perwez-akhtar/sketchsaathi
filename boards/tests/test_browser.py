@@ -187,6 +187,17 @@ class BrowserTests(StaticLiveServerTestCase):
         self.assertFalse(self.page.evaluate(
             "(() => { const e = new Event('beforeunload', {cancelable: true}); window.dispatchEvent(e); return e.defaultPrevented; })()"))
 
+    def test_style_panel_can_be_hidden_and_shown_again(self):
+        self.assertTrue(self.page.is_visible('.style'))
+        self.page.click('#styleHandle')
+        self.page.wait_for_selector('.style', state='hidden')
+        self.page.keyboard.press('Escape')
+        self.assertFalse(self.page.is_visible('.style'))
+        self.assertTrue(self.page.is_visible('#styleHandle'))
+        self.page.click('#styleHandle')
+        self.page.wait_for_selector('.style', state='visible')
+        self.assertEqual(self.page.get_attribute('#styleHandle', 'aria-expanded'), 'true')
+
     def test_select_all_marquee_shift_click_and_nudge(self):
         self.draw_two_rectangles()
         self.page.keyboard.press('Control+a')

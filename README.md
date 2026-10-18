@@ -1,23 +1,33 @@
 <div align="center">
 
-# SketchSaathi
+<a href="https://sketchsaathi.vercel.app" target="_blank" rel="noopener">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/editor-dark.png">
+    <img alt="SketchSaathi editor with a small flow drawn on the canvas" src="docs/images/editor.png" width="860">
+  </picture>
+</a>
 
-**A fast, friendly whiteboard for sketching ideas together.**
+<h4>
+  <a href="https://sketchsaathi.vercel.app">SketchSaathi Editor</a> |
+  <a href="docs/setup.md">Setup</a> |
+  <a href="docs/deploy-vercel.md">Deploy on Vercel</a> |
+  <a href="https://github.com/perwez-akhtar/sketchsaathi/issues">Issues</a>
+</h4>
 
-Draw shapes, write notes, drop in images and plan on multiple pages — then share a link.
+<h2>
+  A fast, friendly whiteboard for sketching ideas together.<br>
+  Draw, write, plan on many pages, then share a link.
+</h2>
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-0d9488.svg)](LICENSE)
-[![Live](https://img.shields.io/badge/live-sketchsaathi.vercel.app-0d9488)](https://sketchsaathi.vercel.app)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/perwez-akhtar/sketchsaathi/pulls)
-[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Django](https://img.shields.io/badge/Django-6.1-092E20?logo=django&logoColor=white)](https://www.djangoproject.com/)
-[![Made in India](https://img.shields.io/badge/made%20in-India-ff9933)](https://sketchsaathi.vercel.app)
+<p>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-0d9488.svg"></a>
+  <a href="https://sketchsaathi.vercel.app"><img alt="Live" src="https://img.shields.io/badge/live-sketchsaathi.vercel.app-0d9488"></a>
+  <a href="https://github.com/perwez-akhtar/sketchsaathi/pulls"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat"></a>
+  <a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white"></a>
+  <a href="https://www.djangoproject.com/"><img alt="Django" src="https://img.shields.io/badge/Django-6.1-092E20?logo=django&logoColor=white"></a>
+</p>
 
-[**Live demo**](https://sketchsaathi.vercel.app) · [Setup](docs/setup.md) · [Deploy on Vercel](docs/deploy-vercel.md)
-
-<br>
-
-<img src="docs/images/editor.png" alt="SketchSaathi editor with a small flow drawn on the canvas" width="860">
+<p><em>Create hand-drawn style diagrams, wireframes, or whatever you like, on your own or together.</em></p>
 
 </div>
 
@@ -25,17 +35,15 @@ Draw shapes, write notes, drop in images and plan on multiple pages — then sha
 
 ## Features
 
-| | |
-|---|---|
-| **Drawing** | Pen, line, arrow, rectangle, diamond, ellipse, text, eraser — hold <kbd>Shift</kbd> for straight lines, squares and circles |
-| **Editing** | Select, move, resize, multi-select, copy / paste, duplicate, layers, flip, lock, full undo / redo |
-| **Styles** | Stroke and fill colours, width, dashed / dotted, rounded edges, opacity, three fonts |
-| **Pages** | Boards hold several pages, like tabs in a notebook, each with its own background |
-| **More tools** | Images (paste or drop), frames, laser pointer, bucket fill, lasso selection |
-| **Sharing** | Share a link; collaborators see each other's cursors in real time (where WebSockets are available) |
-| **Files** | Save a board to a `.saathi` file and open it again, or export a page as PNG |
-| **Guest mode** | Draw without an account — sign up later and your sketches move into it |
-| **Comfort** | Dark mode, mobile layout with pinch-to-zoom, keyboard shortcuts for everything (press <kbd>?</kbd>) |
+- 🎨&nbsp;Hand-drawn style canvas with pen, line, arrow, rectangle, diamond, ellipse, text and eraser.
+- ✏️&nbsp;Select, move, resize, multi-select, copy / paste, layers, flip, lock, and full undo / redo.
+- 🖌️&nbsp;Stroke and fill colours, width, dashed / dotted, rounded edges, opacity, three fonts.
+- 📄&nbsp;Boards with several pages, like tabs in a notebook, each with its own background.
+- 🖼️&nbsp;Images (paste or drop), frames, laser pointer, bucket fill, lasso selection.
+- 🔗&nbsp;Share a link; collaborators see each other's cursors in real time (where WebSockets are available).
+- 💾&nbsp;Autosave to your account, plus save and open `.saathi` files or export a page as PNG.
+- 👤&nbsp;Guest mode: draw without an account, then sign up and your sketches move into it.
+- 🌓&nbsp;Dark mode, mobile layout with pinch-to-zoom, and keyboard shortcuts for everything (press <kbd>?</kbd>).
 
 ## Tech stack
 
@@ -86,11 +94,20 @@ boards/
 docs/            setup and deployment guides
 ```
 
+## Contributing
+
+- Found a bug or missing something? [Open an issue](https://github.com/perwez-akhtar/sketchsaathi/issues).
+- Want to help? Fork the repo, run the [tests](#tests), and send a pull request.
+
 ## Security
 
 Board links use random ids, only owners can rename or delete boards and pages, drawing data is validated,
 logins are rate-limited and production runs with debug off, HTTPS and secure cookies.
 Found a problem? Please open an issue.
+
+## Built with
+
+[Django](https://www.djangoproject.com/) · [Channels](https://channels.readthedocs.io/) · [Bootstrap](https://getbootstrap.com/) · hosted on [Vercel](https://vercel.com) with [Neon](https://neon.tech) Postgres
 
 ## License
 
