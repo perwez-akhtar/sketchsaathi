@@ -74,7 +74,7 @@ class BoardConsumer(AsyncJsonWebsocketConsumer):
 
     async def broadcast(self, event):
         # identity always comes from the server, never from the client
-        event = {**event, 'user': self.user.get_username(), 'cid': self.cid}
+        event = {**event, 'user': self.user.get_username().split('@')[0], 'cid': self.cid}
         await self.channel_layer.group_send(
             self.group, {'type': 'board.event', 'sender': self.channel_name, 'event': event},
         )

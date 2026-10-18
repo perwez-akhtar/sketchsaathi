@@ -38,11 +38,11 @@ class ShareLinkTests(TestCase):
 class AuthPageTests(TestCase):
     def test_signup_creates_user_and_logs_in(self):
         res = self.client.post('/signup/', {
-            'username': 'newbie', 'email': 'n@example.com',
+            'email': 'N@Example.com',
             'password1': 'Str0ng-pass-99', 'password2': 'Str0ng-pass-99',
         })
         self.assertRedirects(res, '/')
-        self.assertTrue(User.objects.filter(username='newbie').exists())
+        self.assertTrue(User.objects.filter(username='n@example.com', email='n@example.com').exists())
         self.assertEqual(self.client.get('/').status_code, 200)
 
     def test_auth_pages_use_bootstrap_fields(self):
@@ -51,7 +51,7 @@ class AuthPageTests(TestCase):
             self.assertContains(res, 'class="form-control"')
         res = self.client.post('/login/', {'username': 'nobody', 'password': 'wrong'})
         self.assertContains(res, 'alert-danger')
-        res = self.client.post('/signup/', {'username': 'x', 'password1': 'Str0ng-pass-99', 'password2': 'other'})
+        res = self.client.post('/signup/', {'email': 'x', 'password1': 'Str0ng-pass-99', 'password2': 'other'})
         self.assertContains(res, 'is-invalid')
 
     def test_login_and_logout(self):
@@ -87,3 +87,29 @@ class RememberMeTests(TestCase):
         self.client.post('/logout/')
         self.client.post('/login/', {'username': 'alice', 'password': 'pw-12345-x', 'remember': 'on'})
         self.assertFalse(self.client.session.get_expire_at_browser_close())
+
+
+class SignupEmailTests(TestCase):
+    PW = 'Str0ng-pass-99'
+
+    def signup(self, email):
+        return self.client.post('/signup/', {'email': email, 'password1': self.PW, 'password2': self.PW})
+
+    def test_temporary_email_domains_are_refused(self):
+        for email in ('a@mailinator.com', 'b@YopMail.com', 'c@mail.tempmail.net', 'd@guerrillamail.com'):
+            res = self.signup(email)
+            self.assertContains(res, 'Temporary email addresses are not allowed')
+        self.assertEqual(User.objects.count(), 0)
+
+    def test_email_is_required_and_must_be_unique(self):
+        self.assertContains(self.signup(''), 'is-invalid')
+        self.assertRedirects(self.signup('me@example.com'), '/')
+        self.client.post('/logout/')
+        self.assertContains(self.signup('ME@example.com'), 'already exists')
+        self.assertEqual(User.objects.count(), 1)
+
+    def test_login_with_email_any_case(self):
+        self.signup('me@example.com')
+        self.client.post('/logout/')
+        res = self.client.post('/login/', {'username': 'Me@Example.com', 'password': self.PW})
+        self.assertRedirects(res, '/')

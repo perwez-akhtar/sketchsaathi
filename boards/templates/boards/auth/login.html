@@ -23,7 +23,7 @@
 
         <form method="post" novalidate class="js-auth-form">
           {% csrf_token %}
-          {% include 'boards/includes/floating_field.html' with field=form.username icon='bi-person' %}
+          {% include 'boards/includes/floating_field.html' with field=form.username icon='bi-envelope' %}
           {% include 'boards/includes/floating_field.html' with field=form.password icon='bi-lock' password=True %}
           <div class="form-check mb-4">
             {{ form.remember }}

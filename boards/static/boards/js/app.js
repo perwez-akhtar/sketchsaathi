@@ -12,6 +12,8 @@
   let pages = [];
   let pageId = null;
   let saveTimer = null;
+  let saving = 0;
+  let saveFailed = false;
 
   const setStatus = text => { $('status').textContent = text; };
   const escapeHtml = text => text.replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -32,22 +34,42 @@
     saveTimer = null;
     if (!pageId) return;
     setStatus('Saving…');
+    saving++;
     try {
       await api.updatePage(pageId, { elements: canvas.getElements(), background: canvas.getBackground() });
+      saveFailed = false;
       setStatus('Saved');
     } catch (error) {
+      saveFailed = true;
       setStatus('Save failed');
       ui.toast(GUEST ? error.message : 'Could not save this page. Check your connection.', 'error', 5000);
+    } finally {
+      saving--;
+    }
+  }
+
+  let creating = null;
+
+  // a sketch with no board yet gets one on the first change, so nothing is lost
+  async function autoSave() {
+    if (boardId) return savePageNow();
+    saveTimer = null;
+    if (!canvas.getElements().length) return;
+    try {
+      creating = creating || ensureBoard().finally(() => { creating = null; });
+      await creating;
+    } catch {
+      setStatus('Save failed');
+      ui.toast('Could not save this sketch. Check your connection.', 'error', 5000);
     }
   }
 
   function scheduleSave(delay = 1500) {
-    if (!boardId) return;
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(savePageNow, delay);
+    saveTimer = setTimeout(autoSave, delay);
   }
 
-  const flushSave = () => (saveTimer ? savePageNow() : Promise.resolve());
+  const flushSave = () => (saveTimer ? autoSave() : Promise.resolve());
 
   async function ensureBoard() {
     if (boardId) return;
@@ -906,7 +928,16 @@
     if (!presence.handle(event)) canvas.applyRemote(event);
   });
 
-  window.addEventListener('beforeunload', () => {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && saveTimer) autoSave();
+  });
+
+  window.addEventListener('beforeunload', event => {
+    // ask before leaving while changes are still unsaved, so nothing is lost by accident
+    if (saveTimer || saving || saveFailed) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
     if (saveTimer && pageId) {
       fetch(`/api/pages/${pageId}/`, {
         method: 'PATCH',

@@ -1,6 +1,9 @@
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth.models import User
+from django.db.models import Q
+
+from .disposable import is_disposable
 
 
 class BootstrapFormMixin:
@@ -29,22 +32,48 @@ class BootstrapFormMixin:
 
 
 class LoginForm(BootstrapFormMixin, AuthenticationForm):
-    autocomplete = {'username': 'username', 'password': 'current-password'}
+    autocomplete = {'username': 'email', 'password': 'current-password'}
     remember = forms.BooleanField(label='Keep me signed in', required=False, initial=True)
-
-
-class SignupForm(BootstrapFormMixin, UserCreationForm):
-    autocomplete = {'username': 'username', 'email': 'email', 'password1': 'new-password', 'password2': 'new-password'}
-
-    class Meta(UserCreationForm.Meta):
-        model = User
-        fields = ['username', 'email']
-        labels = {'email': 'Email (optional)'}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['username'].help_text = 'Letters, digits and @ . + - _ only.'
+        self.fields['username'].label = 'Email'
+        self.fields['username'].widget.attrs['placeholder'] = 'Email'
+
+    def clean(self):
+        # accounts are keyed by email; older accounts can still type their old username
+        typed = (self.cleaned_data.get('username') or '').strip()
+        if '@' in typed:
+            found = list(User.objects.filter(email__iexact=typed).values_list('username', flat=True)[:2])
+            if len(found) == 1:
+                self.cleaned_data['username'] = found[0]
+        return super().clean()
+
+
+class SignupForm(BootstrapFormMixin, UserCreationForm):
+    autocomplete = {'email': 'email', 'password1': 'new-password', 'password2': 'new-password'}
+
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ['email']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['email'].required = True
+        self.fields['email'].label = 'Email'
+        self.fields['email'].widget.attrs['placeholder'] = 'Email'
         self.fields['password1'].help_text = ''
         self.fields['password2'].label = 'Confirm password'
         self.fields['password2'].help_text = ''
         self.fields['password2'].widget.attrs['placeholder'] = 'Confirm password'
+
+    def clean_email(self):
+        email = self.cleaned_data['email'].strip().lower()
+        if len(email) > 150:
+            raise forms.ValidationError('That email address is too long.')
+        if is_disposable(email):
+            raise forms.ValidationError('Temporary email addresses are not allowed. Please use your real email.')
+        if User.objects.filter(Q(email__iexact=email) | Q(username__iexact=email)).exists():
+            raise forms.ValidationError('An account with this email already exists.')
+        self.instance.username = email
+        return email

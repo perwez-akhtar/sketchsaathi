@@ -13,7 +13,7 @@
 
   const password = document.getElementById('id_password1');
   const confirm = document.getElementById('id_password2');
-  const username = document.getElementById('id_username');
+  const username = document.getElementById('id_email');
   const fill = document.getElementById('strengthFill');
   const label = document.getElementById('strengthLabel');
   const LEVELS = [
@@ -26,7 +26,7 @@
 
   function checkStrength() {
     const value = password.value;
-    const name = (username && username.value || '').toLowerCase();
+    const name = (username && username.value || '').toLowerCase().split('@')[0];
     const rules = {
       length: value.length >= 8,
       mix: /[a-z]/i.test(value) && /\d/.test(value),
@@ -67,6 +67,17 @@
     if (confirm) confirm.addEventListener('input', checkMatch);
     checkStrength();
   }
+
+  // clear a field's server error as soon as the person edits it
+  document.querySelectorAll('.js-auth-form input').forEach(input => {
+    input.addEventListener('input', () => {
+      input.classList.remove('is-invalid');
+      const group = input.closest('.auth-field');
+      if (!group) return;
+      group.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+      group.querySelectorAll('.invalid-feedback').forEach(el => el.remove());
+    });
+  });
 
   document.querySelectorAll('.js-auth-form').forEach(form => {
     form.addEventListener('submit', () => {

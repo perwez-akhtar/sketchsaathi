@@ -22,7 +22,7 @@
       <a class="item item-cta" href="{% url 'signup' %}">Sign up to save &amp; share</a>
       <a class="item" href="{% url 'login' %}">Log in</a>
     {% else %}
-      <div class="who">Signed in as <strong>{{ request.user.username }}</strong></div>
+      <div class="who">Signed in as <strong>{{ request.user.email|default:request.user.username }}</strong></div>
       <form method="post" action="{% url 'logout' %}">{% csrf_token %}
         <button type="submit" class="item">Log out</button>
       </form>

@@ -23,7 +23,6 @@
 
         <form method="post" novalidate class="js-auth-form">
           {% csrf_token %}
-          {% include 'boards/includes/floating_field.html' with field=form.username icon='bi-person' %}
           {% include 'boards/includes/floating_field.html' with field=form.email icon='bi-envelope' %}
           {% include 'boards/includes/floating_field.html' with field=form.password1 icon='bi-lock' password=True %}
 
@@ -36,7 +35,7 @@
             <ul class="checklist small mt-2 mb-0">
               <li data-rule="length"><i class="bi bi-circle"></i> At least 8 characters</li>
               <li data-rule="mix"><i class="bi bi-circle"></i> Letters and numbers</li>
-              <li data-rule="notName"><i class="bi bi-circle"></i> Not similar to your username</li>
+              <li data-rule="notName"><i class="bi bi-circle"></i> Not similar to your email</li>
             </ul>
           </div>
 

@@ -161,7 +161,7 @@ class SqlInjectionTests(TestCase):
             self.assertContains(res, 'alert-danger')
         res = self.client.post('/login/', {'username': "alice' --", 'password': 'x'})
         self.assertNotEqual(res.status_code, 302)
-        res = self.client.post('/signup/', {'username': "x'; DROP TABLE auth_user; --",
+        res = self.client.post('/signup/', {'email': "x'; DROP TABLE auth_user; --",
                                             'password1': 'Str0ng-pass-99', 'password2': 'Str0ng-pass-99'})
         self.assertContains(res, 'is-invalid')
         self.assert_database_intact()

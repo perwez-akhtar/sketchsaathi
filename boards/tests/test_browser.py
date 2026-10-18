@@ -175,6 +175,18 @@ class BrowserTests(StaticLiveServerTestCase):
         self.drag((500, 300), (600, 380))
         self.page.keyboard.press('v')
 
+    def test_new_sketch_is_autosaved_and_close_warns_while_unsaved(self):
+        self.assertEqual(Board.objects.filter(owner__username='alice').count(), 0)
+        self.page.keyboard.press('r')
+        self.drag((300, 300), (400, 380))
+        self.assertTrue(self.page.evaluate(
+            "(() => { const e = new Event('beforeunload', {cancelable: true}); window.dispatchEvent(e); return e.defaultPrevented; })()"))
+        self.page.wait_for_function("document.getElementById('status').textContent === 'Saved'", timeout=15000)
+        board = Board.objects.get(owner__username='alice')
+        self.assertEqual([e['type'] for e in board.pages.first().elements], ['rectangle'])
+        self.assertFalse(self.page.evaluate(
+            "(() => { const e = new Event('beforeunload', {cancelable: true}); window.dispatchEvent(e); return e.defaultPrevented; })()"))
+
     def test_select_all_marquee_shift_click_and_nudge(self):
         self.draw_two_rectangles()
         self.page.keyboard.press('Control+a')
@@ -380,7 +392,7 @@ class BrowserTests(StaticLiveServerTestCase):
         guest.click('.ui-dialog .ui-confirm')
         guest.wait_for_selector('input[name=password1]')
         folder = os.environ.get('SCREENSHOT_DIR')
-        guest.fill('input[name=username]', 'newbie')
+        guest.fill('input[name=email]', 'newbie@example.com')
         guest.fill('input[name=password1]', 'Str0ng-pass-99!')
         guest.fill('input[name=password2]', 'Str0ng-pass-99!')
         if folder:
@@ -389,7 +401,7 @@ class BrowserTests(StaticLiveServerTestCase):
         guest.click('button[type=submit]')
         guest.wait_for_function('window.SketchSaathi && SketchSaathi.ready')
         guest.wait_for_function("document.querySelectorAll('.tab').length === 2")
-        board = Board.objects.get(owner__username='newbie')
+        board = Board.objects.get(owner__email='newbie@example.com')
         self.assertEqual(board.pages.count(), 2)
         self.assertEqual([e['type'] for e in board.pages.order_by('position').first().elements], ['rectangle'])
         self.assertIsNone(guest.evaluate("localStorage.getItem('sketchsaathi.guest')"))
