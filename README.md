@@ -74,13 +74,13 @@ Light and dark themes, a mobile layout with pinch-to-zoom, a collapsible style p
 flowchart LR
   B[Browser<br/>canvas + vanilla JS] -- REST --> D[Django + DRF]
   B -. WebSocket .-> C[Channels consumer]
-  D --> P[(Postgres on Neon<br/>MariaDB locally)]
+  D --> P[(Postgres on Neon<br/>MySQL locally)]
   B -- guest mode --> L[(localStorage)]
 ```
 
 - **Frontend:** a hand-written canvas engine (no drawing library) with its own undo history, and Bootstrap 5 for the landing, login and signup pages.
 - **Backend:** Django 6.1 with plain function views, a small REST API for boards and pages, and Channels for live cursors.
-- **Data:** MariaDB / MySQL on your machine, Postgres on Neon in production.
+- **Data:** MySQL (or MariaDB) on your machine, Postgres on Neon in production.
 - **Hosting:** Vercel. Live collaboration needs a Redis channel layer there, so it is switched off on the hosted site.
 
 ## Run it on your computer
@@ -93,7 +93,7 @@ venv\Scripts\activate            # macOS / Linux: source venv/bin/activate
 pip install -r requirements-dev.txt
 ```
 
-Create a MySQL / MariaDB database named `sketchsaathi` (or set `DATABASE_URL` to any Postgres URL), then:
+Create a MySQL (or MariaDB) database named `sketchsaathi` (or set `DATABASE_URL` to any Postgres URL), then:
 
 ```bash
 python manage.py migrate
