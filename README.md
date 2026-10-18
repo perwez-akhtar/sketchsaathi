@@ -10,7 +10,7 @@ Draw shapes, write notes, drop in images and plan on multiple pages — then sha
 [![Django](https://img.shields.io/badge/Django-6.1-092E20?logo=django&logoColor=white)](https://www.djangoproject.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-0d9488.svg)](LICENSE)
 
-[**Live demo**](https://sketchsaathi-studio.vercel.app) · [Setup](docs/setup.md) · [Deploy on Vercel](docs/deploy-vercel.md)
+[**Live demo**](https://sketchsaathi.vercel.app) · [Setup](docs/setup.md) · [Deploy on Vercel](docs/deploy-vercel.md)
 
 </div>
 

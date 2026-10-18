@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}SketchSaathi – sketch together in real time{% endblock %}</title>
+  <title>{% block title %}SketchSaathi – your sketching partner{% endblock %}</title>
   <meta name="description" content="SketchSaathi is a collaborative whiteboard: draw, write and plan together in real time.">
   <script>
     // Same light/dark choice as the drawing app (set before paint to avoid a flash).
@@ -26,7 +26,7 @@
 <body class="{% block body_class %}{% endblock %}">
   <nav class="navbar navbar-expand-md sticky-top site-nav">
     <div class="container">
-      <a class="navbar-brand brand" href="{% url 'home' %}">Co<span>Sketch</span></a>
+      <a class="navbar-brand brand" href="{% url 'home' %}">Sketch<span>Saathi</span></a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#siteNav"
               aria-controls="siteNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
@@ -57,7 +57,7 @@
   {% block footer %}
   <footer class="site-footer">
     <div class="container d-flex flex-column flex-sm-row justify-content-between align-items-center gap-2">
-      <span class="brand small-brand">Co<span>Sketch</span></span>
+      <span class="brand small-brand">Sketch<span>Saathi</span></span>
       <span class="text-body-secondary small">Sketch together, in real time.</span>
     </div>
   </footer>
