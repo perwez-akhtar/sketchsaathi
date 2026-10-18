@@ -6,11 +6,18 @@
 
 Draw shapes, write notes, drop in images and plan on multiple pages — then share a link.
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-0d9488.svg)](LICENSE)
+[![Live](https://img.shields.io/badge/live-sketchsaathi.vercel.app-0d9488)](https://sketchsaathi.vercel.app)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/perwez-akhtar/sketchsaathi/pulls)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/Django-6.1-092E20?logo=django&logoColor=white)](https://www.djangoproject.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-0d9488.svg)](LICENSE)
+[![Made in India](https://img.shields.io/badge/made%20in-India-ff9933)](https://sketchsaathi.vercel.app)
 
 [**Live demo**](https://sketchsaathi.vercel.app) · [Setup](docs/setup.md) · [Deploy on Vercel](docs/deploy-vercel.md)
+
+<br>
+
+<img src="docs/images/editor.png" alt="SketchSaathi editor with a small flow drawn on the canvas" width="860">
 
 </div>
 
