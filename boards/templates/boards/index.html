@@ -9,12 +9,12 @@
 {% endblock %}
 
 {% block scripts %}
-  <script src="{% static 'boards/js/ui.js' %}"></script>
-  <script src="{% static 'boards/js/api.js' %}"></script>
-  <script src="{% static 'boards/js/local-store.js' %}"></script>
-  <script src="{% static 'boards/js/file-io.js' %}"></script>
-  <script src="{% static 'boards/js/canvas.js' %}"></script>
-  <script src="{% static 'boards/js/collab.js' %}"></script>
-  <script src="{% static 'boards/js/presence.js' %}"></script>
-  <script src="{% static 'boards/js/app.js' %}"></script>
+  <script src="{% static 'boards/js/ui.js' %}?v={{ asset_v }}"></script>
+  <script src="{% static 'boards/js/api.js' %}?v={{ asset_v }}"></script>
+  <script src="{% static 'boards/js/local-store.js' %}?v={{ asset_v }}"></script>
+  <script src="{% static 'boards/js/file-io.js' %}?v={{ asset_v }}"></script>
+  <script src="{% static 'boards/js/canvas.js' %}?v={{ asset_v }}"></script>
+  <script src="{% static 'boards/js/collab.js' %}?v={{ asset_v }}"></script>
+  <script src="{% static 'boards/js/presence.js' %}?v={{ asset_v }}"></script>
+  <script src="{% static 'boards/js/app.js' %}?v={{ asset_v }}"></script>
 {% endblock %}

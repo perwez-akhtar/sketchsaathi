@@ -69,12 +69,16 @@
     saveTimer = setTimeout(autoSave, delay);
   }
 
-  const flushSave = () => (saveTimer ? autoSave() : Promise.resolve());
+  // finish any pending save, including a board that is still being created
+  async function flushSave() {
+    if (saveTimer) await autoSave();
+    if (creating) await creating.catch(() => {});
+  }
 
   async function ensureBoard() {
     if (boardId) return;
     const localName = pages[0] && pages[0].name;
-    const board = await api.createBoard($('title').value || 'Untitled');
+    const board = await api.createBoard($('title').value || nextBoardName());
     setBoard(board);
     pageId = board.pages[0].uuid;
     if (localName && localName !== pages[0].name) {
@@ -90,7 +94,7 @@
   async function save() {
     try {
       if (!boardId) return await ensureBoard();
-      const title = $('title').value || 'Untitled';
+      const title = $('title').value || nextBoardName();
       if (title !== savedTitle) {
         await api.renameBoard(boardId, title);
         savedTitle = title;
@@ -152,8 +156,19 @@
     if (LIVE) collab.connect(boardId);
   }
 
+  // next free "Board N" so new boards get a name without any typing
+  let usedTitles = [];
+  const nextBoardName = () => {
+    const taken = new Set(usedTitles.map(t => t.toLowerCase()));
+    let n = usedTitles.length + 1;
+    while (taken.has(`board ${n}`)) n++;
+    return `Board ${n}`;
+  };
+
   async function refreshBoardList() {
     const boards = await api.listBoards();
+    usedTitles = boards.map(b => b.title);
+    if (!boardId && pages.every(p => !p.uuid) && $('title').value === 'Untitled') $('title').value = nextBoardName();
     $('boards').innerHTML = '<option value="">New board</option>' +
       boards.map(b => `<option value="${b.uuid}">${escapeHtml(b.title)}</option>`).join('');
     $('boards').value = boardId || '';
@@ -180,7 +195,7 @@
     presence.clear();
     canvas.load([]);
     showBackground('#ffffff');
-    $('title').value = 'Untitled';
+    $('title').value = nextBoardName();
     $('delete').hidden = true;
     $('boards').value = '';
     renderTabs();
@@ -678,6 +693,145 @@
     $('redo').disabled = !canvas.canRedo();
   });
 
+  // "My boards" gallery: a card with a live preview for every saved board
+  const boardsDialog = $('boardsDialog');
+  const thumbCache = new Map();
+  let galleryBoards = [];
+  let galleryRun = 0;
+
+  const ago = iso => {
+    const seconds = Math.round((new Date(iso) - Date.now()) / 1000);
+    const units = [['year', 31536000], ['month', 2592000], ['day', 86400], ['hour', 3600], ['minute', 60]];
+    const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+    for (const [unit, size] of units) if (Math.abs(seconds) >= size) return rtf.format(Math.round(seconds / size), unit);
+    return 'just now';
+  };
+
+  const PENCIL = '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>';
+  const TRASH = '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3"/></svg>';
+
+  function boardCard(board) {
+    const card = document.createElement('article');
+    card.className = 'board-card' + (board.uuid === boardId ? ' current' : '');
+    card.tabIndex = 0;
+    card.dataset.id = board.uuid;
+    const pageCount = board.pages.length;
+    card.innerHTML = '<div class="thumb"><span class="blank">…</span></div><div class="meta"><strong></strong><span></span></div>';
+    card.querySelector('strong').textContent = board.title;
+    card.querySelector('.meta span').textContent = `${pageCount} ${pageCount === 1 ? 'page' : 'pages'} · ${ago(board.updated_at)}`;
+    if (board.uuid === boardId) card.insertAdjacentHTML('afterbegin', '<span class="badge">Open now</span>');
+    if (board.is_owner) {
+      const action = (cls, label, icon, run) => {
+        const button = document.createElement('button');
+        button.className = cls;
+        button.title = label;
+        button.setAttribute('aria-label', label);
+        button.innerHTML = icon;
+        button.onclick = event => { event.stopPropagation(); run(board); };
+        card.appendChild(button);
+      };
+      action('del ren', 'Rename board', PENCIL, renameInGallery);
+      action('del', 'Delete board', TRASH, removeFromGallery);
+    }
+    const open = () => { boardsDialog.close(); openBoard(board.uuid); };
+    card.onclick = open;
+    card.onkeydown = event => { if (event.key === 'Enter' && event.target === card) open(); };
+    return card;
+  }
+
+  async function loadThumbnails(run) {
+    for (const board of galleryBoards) {
+      if (run !== galleryRun) return;
+      const card = $('boardGrid').querySelector(`[data-id="${board.uuid}"]`);
+      if (!card) continue;
+      const key = `${board.uuid}:${board.updated_at}`;
+      let url = thumbCache.get(key);
+      if (url === undefined) {
+        try {
+          const first = [...board.pages].sort((a, b) => a.position - b.position)[0];
+          const page = await api.getPage(first.uuid);
+          url = page.elements.length ? canvas.thumbnail(page.elements, page.background).toDataURL('image/png') : '';
+        } catch { url = ''; }
+        thumbCache.set(key, url);
+      }
+      if (run !== galleryRun) return;
+      const thumb = card.querySelector('.thumb');
+      if (url) thumb.innerHTML = `<img alt="" src="${url}">`;
+      else thumb.innerHTML = '<span class="blank">Empty board</span>';
+    }
+  }
+
+  function renderGallery() {
+    const term = $('boardSearch').value.trim().toLowerCase();
+    const grid = $('boardGrid');
+    const shown = galleryBoards.filter(b => b.title.toLowerCase().includes(term));
+    grid.innerHTML = '';
+    if (!term) {
+      const fresh = document.createElement('button');
+      fresh.className = 'board-new';
+      fresh.innerHTML = '<span class="plus">+</span>New board';
+      fresh.onclick = () => { boardsDialog.close(); newBoard(); };
+      grid.appendChild(fresh);
+    }
+    shown.forEach(b => grid.appendChild(boardCard(b)));
+    $('boardEmpty').hidden = !(term && !shown.length);
+    const run = ++galleryRun;
+    loadThumbnails(run);
+  }
+
+  async function renameInGallery(board) {
+    const typed = await ui.prompt({ title: 'Rename board', value: board.title, confirmText: 'Rename' });
+    const title = (typed || '').trim().slice(0, 200);
+    if (!title || title === board.title) return;
+    try {
+      await api.renameBoard(board.uuid, title);
+      board.title = title;
+      if (board.uuid === boardId) { $('title').value = title; savedTitle = title; }
+      renderGallery();
+      refreshBoardList();
+      ui.toast('Board renamed', 'success');
+    } catch {
+      ui.toast('Could not rename the board.', 'error');
+    }
+  }
+
+  async function removeFromGallery(board) {
+    const ok = await ui.confirm({
+      title: 'Delete this board?',
+      message: `"${board.title}" and all its pages will be deleted for everyone. This can't be undone.`,
+      confirmText: 'Delete board', danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.deleteBoard(board.uuid);
+      galleryBoards = galleryBoards.filter(b => b.uuid !== board.uuid);
+      if (board.uuid === boardId) newBoard();
+      renderGallery();
+      refreshBoardList();
+      ui.toast('Board deleted', 'success');
+    } catch {
+      ui.toast('Could not delete the board.', 'error');
+    }
+  }
+
+  async function showBoards() {
+    toggleMenu(false);
+    try {
+      await flushSave();
+      galleryBoards = await api.listBoards();
+    } catch {
+      return ui.toast('Could not load your boards.', 'error');
+    }
+    $('boardSearch').value = '';
+    renderGallery();
+    boardsDialog.showModal();
+  }
+  $('myBoards').onclick = showBoards;
+  $('boardSearch').addEventListener('input', renderGallery);
+  boardsDialog.querySelector('[data-close]').onclick = () => boardsDialog.close();
+  boardsDialog.addEventListener('click', e => { if (e.target === boardsDialog) boardsDialog.close(); });
+  boardsDialog.addEventListener('close', () => { galleryRun++; });
+
   const help = $('help');
   $('helpButton').onclick = () => help.showModal();
   help.querySelector('[data-close]').onclick = () => help.close();
@@ -927,6 +1081,15 @@
   canvas.on('change', () => scheduleSave());
 
   collab.onState(setStatus);
+  // after a dropped connection, pick up whatever others drew while we were away
+  collab.onReconnect(async () => {
+    if (!boardId || !pageId) return;
+    try {
+      await flushSave();
+      await refreshPages();
+      await loadPage(pageId);
+    } catch {}
+  });
   collab.onEvent(event => {
     if (event.type === 'join') collab.send({ type: 'hello' });
     if (event.type === 'pages') return refreshPages();

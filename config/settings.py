@@ -39,8 +39,11 @@ ALLOWED_HOSTS = [h for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h]
 if ON_VERCEL:
     ALLOWED_HOSTS += ['.vercel.app']
 
-# Vercel has no WebSockets, so live collaboration is off there
-LIVE_COLLAB = os.environ.get('LIVE_COLLAB', 'False' if ON_VERCEL else 'True').lower() in ('1', 'true', 'yes')
+# a free Redis (e.g. Upstash) lets several servers share live updates; the Vercel integration sets one of these
+REDIS_URL = os.environ.get('REDIS_URL') or os.environ.get('KV_URL') or ''
+
+# on Vercel live collaboration needs that shared Redis; locally one process is enough
+LIVE_COLLAB = os.environ.get('LIVE_COLLAB', 'True' if (REDIS_URL or not ON_VERCEL) else 'False').lower() in ('1', 'true', 'yes')
 
 
 INSTALLED_APPS = [
@@ -85,6 +88,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'boards.context.assets',
             ],
         },
     },
@@ -158,10 +162,18 @@ REST_FRAMEWORK = {
 
 ASGI_APPLICATION = 'config.asgi.application'
 
-# in-memory layer works for one process only; use channels-redis in production
-CHANNEL_LAYERS = {
-    'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'},
-}
+def channel_layers(redis_url):
+    if not redis_url:
+        # one process only, fine for local development
+        return {'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}}
+    # pub/sub keeps one connection open and sends no polling commands, which suits a free Redis plan
+    return {'default': {
+        'BACKEND': 'channels_redis.pubsub.RedisPubSubChannelLayer',
+        'CONFIG': {'hosts': [redis_url]},
+    }}
+
+
+CHANNEL_LAYERS = channel_layers(REDIS_URL)
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 

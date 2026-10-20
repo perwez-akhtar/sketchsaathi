@@ -1219,6 +1219,25 @@ SketchSaathi.canvas = (() => {
       render();
     },
 
+    // small preview of a page for the "My boards" gallery
+    thumbnail(list, bg, width = 360, height = 220) {
+      const out = document.createElement('canvas');
+      out.width = width; out.height = height;
+      const octx = out.getContext('2d');
+      octx.fillStyle = bg || '#ffffff';
+      octx.fillRect(0, 0, width, height);
+      if (!list.length) return out;
+      const boxes = list.map(bounds);
+      const minX = Math.min(...boxes.map(b => b.x)), minY = Math.min(...boxes.map(b => b.y));
+      const w = Math.max(...boxes.map(b => b.x + b.width)) - minX || 1;
+      const h = Math.max(...boxes.map(b => b.y + b.height)) - minY || 1;
+      const scale = Math.min((width - 36) / w, (height - 36) / h, 1.2);
+      octx.translate((width - w * scale) / 2 - minX * scale, (height - h * scale) / 2 - minY * scale);
+      octx.scale(scale, scale);
+      list.forEach(el => drawElement(octx, el));
+      return out;
+    },
+
     exportPng(filename) {
       if (!elements.length) return;
       const link = document.createElement('a');

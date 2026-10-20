@@ -198,6 +198,84 @@ class BrowserTests(StaticLiveServerTestCase):
         self.page.wait_for_selector('.style', state='visible')
         self.assertEqual(self.page.get_attribute('#styleHandle', 'aria-expanded'), 'true')
 
+    def test_my_boards_gallery_shows_previews_search_open_and_delete(self):
+        self.page.keyboard.press('r')
+        self.drag((300, 300), (480, 400))
+        self.page.click('#menuButton')
+        self.page.fill('#title', 'Roadmap')
+        self.page.press('#title', 'Enter')
+        self.page.wait_for_function("document.getElementById('status').textContent === 'Saved'", timeout=15000)
+        self.page.select_option('#boards', '')
+        self.page.keyboard.press('Escape')
+        self.page.mouse.click(700, 600)
+        self.page.keyboard.press('o')
+        self.drag((500, 300), (640, 380))
+
+        self.page.click('#myBoards')
+        self.page.wait_for_selector('#boardsDialog[open]')
+        self.page.wait_for_function("document.querySelectorAll('#boardGrid .board-card img').length === 2", timeout=15000)
+        self.assertEqual(self.page.locator('#boardGrid .board-card').count(), 2)
+        self.assertEqual(self.page.locator('#boardGrid .board-card.current .badge').count(), 1)
+        self.page.locator('#boardGrid .board-card').last.hover()
+        self.page.wait_for_timeout(700)
+        self.shot('30-my-boards')
+
+        self.page.fill('#boardSearch', 'road')
+        self.assertEqual(self.page.locator('#boardGrid .board-card').count(), 1)
+        self.page.fill('#boardSearch', 'zzz')
+        self.assertTrue(self.page.is_visible('#boardEmpty'))
+        self.page.fill('#boardSearch', '')
+
+        self.page.locator('#boardGrid .board-card', has_text='Roadmap').click()
+        self.page.wait_for_function("document.getElementById('title').value === 'Roadmap'")
+        self.page.wait_for_function("SketchSaathi.canvas.getElements().map(e => e.type).join() === 'rectangle'")
+
+        self.page.click('#myBoards')
+        self.page.wait_for_selector('#boardGrid .board-card')
+        roadmap = self.page.locator('#boardGrid .board-card', has_text='Roadmap')
+        roadmap.hover()
+        roadmap.locator('.ren').click()
+        self.page.fill('.ui-dialog-input', 'Q4 Roadmap')
+        self.page.click('.ui-dialog .ui-confirm')
+        self.page.wait_for_selector('#boardGrid .board-card:has-text("Q4 Roadmap")')
+        self.assertEqual(self.page.input_value('#title'), 'Q4 Roadmap')
+        self.assertTrue(Board.objects.filter(title='Q4 Roadmap').exists())
+        self.page.locator('#boardGrid .board-card', has_text='Board').hover()
+        self.page.locator('#boardGrid .board-card', has_text='Board').locator('.del:not(.ren)').click()
+        self.page.click('.ui-dialog .ui-confirm')
+        self.page.wait_for_function("document.querySelectorAll('#boardGrid .board-card').length === 1")
+        self.assertEqual(Board.objects.filter(owner__username='alice').count(), 1)
+
+    def test_live_connection_reconnects_and_reloads_after_a_drop(self):
+        log = self.page.evaluate("""async () => {
+          const made = [], states = [], reconnects = [];
+          const Real = window.WebSocket;
+          window.WebSocket = class { constructor(url) { this.url = url; this.readyState = 0; made.push(this); } send() {} close() { this.readyState = 3; } };
+          WebSocket.OPEN = 1; WebSocket.CLOSED = 3;
+          const collab = SketchSaathi.collab;
+          collab.onState(s => states.push(s));
+          collab.onReconnect(() => reconnects.push(1));
+          const wait = ms => new Promise(r => setTimeout(r, ms));
+          collab.connect('11111111-1111-1111-1111-111111111111');
+          made[0].readyState = 1; made[0].onopen();
+          made[0].readyState = 3; made[0].onclose({ code: 1006 });
+          await wait(1800);
+          const second = made.length;
+          made[1].readyState = 1; made[1].onopen();
+          const reloaded = reconnects.length;
+          made[1].readyState = 3; made[1].onclose({ code: 4404 });
+          await wait(2200);
+          const afterFinal = made.length;
+          collab.disconnect();
+          window.WebSocket = Real;
+          return { states, second, reloaded, afterFinal, url: made[0].url };
+        }""")
+        self.assertEqual(log['states'], ['Live', 'Reconnecting…', 'Live', 'Offline'])
+        self.assertEqual(log['second'], 2, 'it reconnected on its own after the drop')
+        self.assertEqual(log['reloaded'], 1, 'the app is told to reload the page after a reconnect')
+        self.assertEqual(log['afterFinal'], 2, 'a "not allowed / not found" close is final, no retry')
+        self.assertTrue(log['url'].endswith('/ws/boards/11111111-1111-1111-1111-111111111111/'))
+
     def test_select_all_marquee_shift_click_and_nudge(self):
         self.draw_two_rectangles()
         self.page.keyboard.press('Control+a')
@@ -744,13 +822,13 @@ class BrowserTests(StaticLiveServerTestCase):
         self.page.click('#menuButton')
         self.page.select_option('#boards', '')                      # New board
         self.assertEqual(self.elements(), [])
-        self.assertEqual(self.page.input_value('#title'), 'Untitled')
+        self.assertRegex(self.page.input_value('#title'), r'^Board \d+$')
         self.page.keyboard.press('Escape')
         self.page.keyboard.press('o')
         self.drag((500, 300), (600, 380))
         self.page.click('#addPage')
         self.page.wait_for_function("document.querySelectorAll('.tab').length === 2")
-        self.assertEqual(sorted(options()), ['First', 'New board', 'Untitled'])
+        self.assertEqual(sorted(options()), ['Board 2', 'First', 'New board'])
 
         first = self.page.evaluate("[...document.querySelectorAll('#boards option')].find(o => o.textContent === 'First').value")
         self.page.click('#menuButton')

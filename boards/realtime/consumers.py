@@ -12,6 +12,8 @@ PRESENCE_EVENTS = {'cursor', 'hello'}
 HEX_COLOR = re.compile(r'#[0-9a-fA-F]{6}')
 MAX_MESSAGE_CHARS = 1_000_000
 MAX_MESSAGES_PER_SECOND = 120
+# cursor and laser positions are sent very often; thin them out so a free Redis plan lasts
+MIN_SECONDS_BETWEEN = {'cursor': 0.12, 'laser': 0.07}
 
 
 def is_number(value):
@@ -32,6 +34,7 @@ class BoardConsumer(AsyncJsonWebsocketConsumer):
         self.cid = uuid.uuid4().hex[:8]
         self.window_start = time.monotonic()
         self.window_count = 0
+        self.last_sent = {}
         self.group = f'board_{self.board_uuid}'
         await self.channel_layer.group_add(self.group, self.channel_name)
         await self.accept()
@@ -67,10 +70,22 @@ class BoardConsumer(AsyncJsonWebsocketConsumer):
         elif kind == 'hello':
             await self.broadcast({'type': 'hello'})
         elif kind == 'laser' and is_number(content.get('x')) and is_number(content.get('y')):
+            too_soon = self.too_soon('laser')
+            if content.get('start') is not True and too_soon:
+                return
             await self.broadcast({'type': 'laser', 'x': content['x'], 'y': content['y'],
                                   'start': content.get('start') is True, 'page': content.get('page')})
         elif kind == 'cursor' and is_number(content.get('x')) and is_number(content.get('y')):
+            if self.too_soon('cursor'):
+                return
             await self.broadcast({'type': 'cursor', 'x': content['x'], 'y': content['y'], 'page': content.get('page')})
+
+    def too_soon(self, kind):
+        now = time.monotonic()
+        if now - self.last_sent.get(kind, 0) < MIN_SECONDS_BETWEEN[kind]:
+            return True
+        self.last_sent[kind] = now
+        return False
 
     async def broadcast(self, event):
         # identity always comes from the server, never from the client

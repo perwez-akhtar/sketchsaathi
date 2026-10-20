@@ -98,3 +98,22 @@ class BoardSocketTests(TransactionTestCase):
         connected, code = await connect('00000000-0000-0000-0000-000000000000', alice).connect()
         self.assertFalse(connected)
         self.assertEqual(code, 4404)
+
+
+class CursorThrottleTests(BoardSocketTests):
+    async def test_fast_cursor_updates_are_thinned_but_laser_start_always_passes(self):
+        alice, bob, _ = await self.open_pair()
+        for i in range(30):
+            await bob.send_json_to({'type': 'cursor', 'x': i, 'y': i, 'page': 'p'})
+        await bob.send_json_to({'type': 'laser', 'x': 1, 'y': 1, 'start': True, 'page': 'p'})
+        await bob.send_json_to({'type': 'laser', 'x': 2, 'y': 2, 'start': False, 'page': 'p'})
+        await bob.send_json_to({'type': 'laser', 'x': 3, 'y': 3, 'start': True, 'page': 'p'})
+        seen = []
+        while not await alice.receive_nothing(timeout=0.3):
+            seen.append(await alice.receive_json_from())
+        cursors = [e for e in seen if e['type'] == 'cursor']
+        lasers = [e for e in seen if e['type'] == 'laser']
+        self.assertEqual(len(cursors), 1, 'a burst of cursor moves collapses to one')
+        self.assertEqual([e['start'] for e in lasers], [True, True], 'laser starts are never dropped, fast moves are')
+        await alice.disconnect()
+        await bob.disconnect()

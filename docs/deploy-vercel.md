@@ -61,12 +61,22 @@ For an admin account run `python manage.py createsuperuser` with `DATABASE_URL` 
 | Environment variables | Redeploy |
 | Database structure (new model field) | Push, then run `migrate` again as in step 4 |
 
-## Live collaboration
+## Live collaboration (free Redis)
 
-Vercel supports WebSockets (beta), but each connection is pinned to one function instance and closes at
-the function's maximum duration. Sharing drawings between people therefore needs a Redis channel layer
-and automatic reconnecting in the client. Until that is added, `LIVE_COLLAB` stays off on Vercel:
-everything else (drawing, saving, pages, files, guest mode, login) works.
+Drawing, saving, pages and sharing a link work without this. To also see other people's cursors and strokes
+live, add a free Redis:
+
+1. In Vercel open **Storage → Create → Upstash for Redis**, choose the **Free** plan and connect it to this project.
+2. Vercel adds a connection variable (`REDIS_URL` or `KV_URL`) automatically. Check it under **Settings → Environment Variables**.
+3. Redeploy. Live mode switches on by itself when that variable exists, and the status shows **Live** on a shared board.
+
+Notes:
+
+- The free plan allows about 500,000 commands a month. The app sends one pub/sub message per drawing change and
+  thins out cursor and laser updates (about 8 a second per person) to make that last.
+- Vercel's WebSocket support is in beta and connections are cut after the function's maximum duration. The browser
+  reconnects on its own, then reloads the page so nothing drawn in the meantime is missed.
+- To turn live mode off again, set `LIVE_COLLAB=False`.
 
 ## Troubleshooting
 

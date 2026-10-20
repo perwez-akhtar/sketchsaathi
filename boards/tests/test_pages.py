@@ -113,3 +113,13 @@ class SignupEmailTests(TestCase):
         self.client.post('/logout/')
         res = self.client.post('/login/', {'username': 'Me@Example.com', 'password': self.PW})
         self.assertRedirects(res, '/')
+
+
+class AssetVersionTests(TestCase):
+    def test_css_and_js_links_carry_a_version_so_browsers_never_use_stale_files(self):
+        for url in ('/', '/draw/', '/login/'):
+            html = self.client.get(url).content.decode()
+            links = [part for part in html.split('"') if part.endswith(('.css', '.js')) or '.css?' in part or '.js?' in part]
+            local = [l for l in links if '/static/boards/' in l]
+            self.assertTrue(local, url)
+            self.assertTrue(all('?v=' in l and l.split('?v=')[1].isdigit() for l in local), local)
